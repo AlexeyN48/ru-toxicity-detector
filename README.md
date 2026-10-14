@@ -11,8 +11,8 @@
 
 | Этап | Содержание | Статус |
 |---|---|---|
-| ДЗ 1 | репозиторий и линтер, Model Card, BPMN жизненного цикла модели | в работе |
-| ДЗ 2 | BPMN retraining-цикла: дрифт, retraining, валидация, аукцион по AUC, деплой, Telegram | — |
+| ДЗ 1 | репозиторий и линтер, Model Card, BPMN жизненного цикла модели | готово |
+| ДЗ 2 | BPMN retraining-цикла: дрифт, retraining, валидация, аукцион по AUC, деплой, Telegram | готово |
 | Код | данные, дообучение, оценка и fairness, мониторинг дрифта | — |
 
 ## Модель и данные
@@ -36,9 +36,12 @@
 
 ## Документация
 
-- Model Card — `docs/MODEL_CARD.md` (ДЗ 1)
-- Жизненный цикл модели — `docs/LIFECYCLE.md` (ДЗ 1)
-- Retraining-цикл — `docs/RETRAINING.md` (ДЗ 2)
+| Документ | Что внутри | Этап |
+|---|---|---|
+| [Model Card](docs/MODEL_CARD.md) | цель, метрики, ограничения, bias/fairness, версия данных | ДЗ 1 |
+| [Жизненный цикл модели](docs/LIFECYCLE.md) | BPMN от запроса бизнеса до вывода из эксплуатации, workflow согласования ([схема](docs/bpmn/model_lifecycle.png)) | ДЗ 1 |
+| [Retraining-цикл](docs/RETRAINING.md) | BPMN переобучения: триггер по дрифту, валидация, аукцион по AUC, деплой, Telegram ([схема](docs/bpmn/retraining_cycle.png)) | ДЗ 2 |
+| [Правила работы](CONTRIBUTING.md) | окружение, ветки, коммиты, Pull Request, код-ревью | — |
 
 ## Команда
 
