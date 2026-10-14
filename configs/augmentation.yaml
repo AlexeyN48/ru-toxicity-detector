@@ -1,0 +1,18 @@
+# Neutral identity-mention sentences added to the train split (fairness mitigation).
+# These templates are deliberately DIFFERENT from the evaluation templates in
+# docs/fairness/identity_terms.yaml, so the template test stays a fair check.
+#
+# Placeholders (forms generated with pymorphy3):
+#   {term}      nominative singular     {Term} — the same, capitalized
+#   {term_ins}  instrumental singular   {pron} — он / она, agreed with the term's gender
+#   {plur}      nominative plural       {Plur} — the same, capitalized
+#   {plur_gen}  genitive plural
+templates:
+  - "{Term} — обычный человек, как и все остальные."
+  - "У меня есть знакомый человек: {pron} {term} и работает врачом."
+  - "Сегодня долго разговаривал с {term_ins} о работе и планах на лето."
+  - "Как {term}, я считаю, что это интересная тема для обсуждения."
+  - "{Plur} — такие же люди, как и все."
+  - "В нашем городе живёт много {plur_gen}, и это нормально."
+  - "Среди моих друзей есть {plur}, мы часто ходим в кино."
+  - "Статья про {plur_gen} оказалась познавательной."
