@@ -1,0 +1,11 @@
+# Normalize line endings: the team works on different OSes
+* text=auto eol=lf
+
+*.bat  text eol=crlf
+*.ps1  text eol=crlf
+
+*.bpmn text
+*.png  binary
+*.jpg  binary
+*.pdf  binary
+*.docx binary

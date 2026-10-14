@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Secrets (Telegram bot token etc.)
+.env
+.env.*
+!.env.example
+
+# Tools
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data: only README.md and manifest.json are tracked
+data/*
+!data/.gitkeep
+!data/README.md
+!data/manifest.json
+
+# Models, checkpoints and experiment tracking
+models/
+checkpoints/
+outputs/
+mlruns/
+wandb/
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Office lock files
+~$*
