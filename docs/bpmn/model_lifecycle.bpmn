@@ -1,0 +1,494 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_ModelLifecycle" targetNamespace="https://github.com/ru-toxicity-detector" exporter="ru-toxicity-detector" exporterVersion="1.0">
+  <bpmn:collaboration id="Collaboration_ModelLifecycle">
+    <bpmn:participant id="Participant_Lifecycle" name="Жизненный цикл модели ru-toxicity-detector" processRef="Process_ModelLifecycle" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_ModelLifecycle" name="Жизненный цикл модели" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_Roles">
+      <bpmn:lane id="Lane_Product" name="Product Owner">
+        <bpmn:flowNodeRef>Start_ModelRequest</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_DefineGoal</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_BusinessApproval</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_Business</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Decommission</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Decommissioned</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Data" name="Data Engineer">
+        <bpmn:flowNodeRef>Task_CollectData</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_VersionData</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_ML" name="ML Engineer">
+        <bpmn:flowNodeRef>Task_FineTune</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Evaluate</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_Metrics</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_UpdateCard</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_QA" name="Fairness / QA">
+        <bpmn:flowNodeRef>Task_Fairness</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_Fairness</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Reproduce</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Approver" name="Approver (тимлид)">
+        <bpmn:flowNodeRef>Task_TechReview</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_TechReview</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_MLOps" name="MLOps">
+        <bpmn:flowNodeRef>Task_Deploy</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Monitor</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_Monitor</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Timer_NextCheck</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Call_Retraining</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start_ModelRequest" name="Запрос бизнеса на модель">
+      <bpmn:outgoing>Flow_01</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="Start_ModelRequest_def" />
+    </bpmn:startEvent>
+    <bpmn:userTask id="Task_DefineGoal" name="Сформулировать бизнес-задачу и критерии успеха">
+      <bpmn:incoming>Flow_01</bpmn:incoming>
+      <bpmn:incoming>Flow_19</bpmn:incoming>
+      <bpmn:outgoing>Flow_02</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="Task_CollectData" name="Собрать и разметить данные">
+      <bpmn:incoming>Flow_02</bpmn:incoming>
+      <bpmn:incoming>Flow_11</bpmn:incoming>
+      <bpmn:outgoing>Flow_03</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="Task_VersionData" name="Версионировать датасет">
+      <bpmn:incoming>Flow_03</bpmn:incoming>
+      <bpmn:outgoing>Flow_04</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Task_FineTune" name="Дообучить модель">
+      <bpmn:incoming>Flow_04</bpmn:incoming>
+      <bpmn:incoming>Flow_08</bpmn:incoming>
+      <bpmn:incoming>Flow_16</bpmn:incoming>
+      <bpmn:outgoing>Flow_05</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Task_Evaluate" name="Оценить метрики на test">
+      <bpmn:incoming>Flow_05</bpmn:incoming>
+      <bpmn:outgoing>Flow_06</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gw_Metrics" name="Метрики ≥ целевых?">
+      <bpmn:incoming>Flow_06</bpmn:incoming>
+      <bpmn:outgoing>Flow_07</bpmn:outgoing>
+      <bpmn:outgoing>Flow_08</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_Fairness" name="Fairness-анализ по подгруппам">
+      <bpmn:incoming>Flow_07</bpmn:incoming>
+      <bpmn:outgoing>Flow_09</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gw_Fairness" name="Fairness-критерии выполнены?">
+      <bpmn:incoming>Flow_09</bpmn:incoming>
+      <bpmn:outgoing>Flow_10</bpmn:outgoing>
+      <bpmn:outgoing>Flow_11</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Task_Reproduce" name="Воспроизвести результат независимо">
+      <bpmn:incoming>Flow_10</bpmn:incoming>
+      <bpmn:outgoing>Flow_12</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="Task_UpdateCard" name="Обновить Model Card">
+      <bpmn:incoming>Flow_12</bpmn:incoming>
+      <bpmn:outgoing>Flow_13</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="Task_TechReview" name="Техническое ревью Model Card и отчётов">
+      <bpmn:incoming>Flow_13</bpmn:incoming>
+      <bpmn:outgoing>Flow_14</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gw_TechReview" name="Одобрено технически?">
+      <bpmn:incoming>Flow_14</bpmn:incoming>
+      <bpmn:outgoing>Flow_15</bpmn:outgoing>
+      <bpmn:outgoing>Flow_16</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Task_BusinessApproval" name="Бизнес-согласование выкатки">
+      <bpmn:incoming>Flow_15</bpmn:incoming>
+      <bpmn:outgoing>Flow_17</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gw_Business" name="Согласовано бизнесом?">
+      <bpmn:incoming>Flow_17</bpmn:incoming>
+      <bpmn:outgoing>Flow_18</bpmn:outgoing>
+      <bpmn:outgoing>Flow_19</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_Deploy" name="Деплой: shadow → prod">
+      <bpmn:incoming>Flow_18</bpmn:incoming>
+      <bpmn:outgoing>Flow_20</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Task_Monitor" name="Мониторинг качества и дрифта">
+      <bpmn:incoming>Flow_20</bpmn:incoming>
+      <bpmn:incoming>Flow_23</bpmn:incoming>
+      <bpmn:incoming>Flow_25</bpmn:incoming>
+      <bpmn:outgoing>Flow_21</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gw_Monitor" name="Результат мониторинга">
+      <bpmn:incoming>Flow_21</bpmn:incoming>
+      <bpmn:outgoing>Flow_22</bpmn:outgoing>
+      <bpmn:outgoing>Flow_24</bpmn:outgoing>
+      <bpmn:outgoing>Flow_26</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateCatchEvent id="Timer_NextCheck" name="Ежедневная проверка">
+      <bpmn:incoming>Flow_24</bpmn:incoming>
+      <bpmn:outgoing>Flow_25</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Timer_NextCheck_def">
+        <bpmn:timeCycle xsi:type="bpmn:tFormalExpression">R/P1D</bpmn:timeCycle>
+      </bpmn:timerEventDefinition>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:callActivity id="Call_Retraining" name="Retraining-цикл (ДЗ 2)" calledElement="Process_RetrainingCycle">
+      <bpmn:incoming>Flow_22</bpmn:incoming>
+      <bpmn:outgoing>Flow_23</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:userTask id="Task_Decommission" name="Решение о выводе модели из эксплуатации">
+      <bpmn:incoming>Flow_26</bpmn:incoming>
+      <bpmn:outgoing>Flow_27</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="End_Decommissioned" name="Модель выведена из эксплуатации">
+      <bpmn:incoming>Flow_27</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_01" sourceRef="Start_ModelRequest" targetRef="Task_DefineGoal" />
+    <bpmn:sequenceFlow id="Flow_02" sourceRef="Task_DefineGoal" targetRef="Task_CollectData" />
+    <bpmn:sequenceFlow id="Flow_03" sourceRef="Task_CollectData" targetRef="Task_VersionData" />
+    <bpmn:sequenceFlow id="Flow_04" sourceRef="Task_VersionData" targetRef="Task_FineTune" />
+    <bpmn:sequenceFlow id="Flow_05" sourceRef="Task_FineTune" targetRef="Task_Evaluate" />
+    <bpmn:sequenceFlow id="Flow_06" sourceRef="Task_Evaluate" targetRef="Gw_Metrics" />
+    <bpmn:sequenceFlow id="Flow_07" name="да" sourceRef="Gw_Metrics" targetRef="Task_Fairness">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${roc_auc &gt;= 0.95 &amp;&amp; f1_toxic &gt;= 0.85}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_08" name="нет" sourceRef="Gw_Metrics" targetRef="Task_FineTune">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${roc_auc &lt; 0.95 || f1_toxic &lt; 0.85}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_09" sourceRef="Task_Fairness" targetRef="Gw_Fairness" />
+    <bpmn:sequenceFlow id="Flow_10" name="да" sourceRef="Gw_Fairness" targetRef="Task_Reproduce">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${fairness_passed}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_11" name="нет: дополнить данные" sourceRef="Gw_Fairness" targetRef="Task_CollectData">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${!fairness_passed}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_12" sourceRef="Task_Reproduce" targetRef="Task_UpdateCard" />
+    <bpmn:sequenceFlow id="Flow_13" sourceRef="Task_UpdateCard" targetRef="Task_TechReview" />
+    <bpmn:sequenceFlow id="Flow_14" sourceRef="Task_TechReview" targetRef="Gw_TechReview" />
+    <bpmn:sequenceFlow id="Flow_15" name="да" sourceRef="Gw_TechReview" targetRef="Task_BusinessApproval">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${tech_approved}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_16" name="нет: замечания → доработка" sourceRef="Gw_TechReview" targetRef="Task_FineTune">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${!tech_approved}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_17" sourceRef="Task_BusinessApproval" targetRef="Gw_Business" />
+    <bpmn:sequenceFlow id="Flow_18" name="да" sourceRef="Gw_Business" targetRef="Task_Deploy">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${business_approved}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_19" name="нет: пересмотреть требования" sourceRef="Gw_Business" targetRef="Task_DefineGoal">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${!business_approved}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_20" sourceRef="Task_Deploy" targetRef="Task_Monitor" />
+    <bpmn:sequenceFlow id="Flow_21" sourceRef="Task_Monitor" targetRef="Gw_Monitor" />
+    <bpmn:sequenceFlow id="Flow_22" name="дрифт" sourceRef="Gw_Monitor" targetRef="Call_Retraining">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${drift_detected}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_23" sourceRef="Call_Retraining" targetRef="Task_Monitor" />
+    <bpmn:sequenceFlow id="Flow_24" name="норма" sourceRef="Gw_Monitor" targetRef="Timer_NextCheck">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${!drift_detected &amp;&amp; !retire}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_25" sourceRef="Timer_NextCheck" targetRef="Task_Monitor" />
+    <bpmn:sequenceFlow id="Flow_26" name="модель устарела" sourceRef="Gw_Monitor" targetRef="Task_Decommission">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${retire}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_27" sourceRef="Task_Decommission" targetRef="End_Decommissioned" />
+    <bpmn:textAnnotation id="Note_Retraining">
+      <bpmn:text>Подробно — в ДЗ 2 (retraining_cycle.bpmn)</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:association id="Note_Retraining_assoc" associationDirection="None" sourceRef="Call_Retraining" targetRef="Note_Retraining" />
+    <bpmn:textAnnotation id="Note_Approval">
+      <bpmn:text>Workflow согласования: техническое ревью (тимлид) → бизнес-согласование (Product Owner)</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:association id="Note_Approval_assoc" associationDirection="None" sourceRef="Task_TechReview" targetRef="Note_Approval" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_ModelLifecycle">
+    <bpmndi:BPMNPlane id="Plane_ModelLifecycle" bpmnElement="Collaboration_ModelLifecycle">
+      <bpmndi:BPMNShape id="Participant_Lifecycle_di" bpmnElement="Participant_Lifecycle" isHorizontal="true">
+        <dc:Bounds x="120" y="80" width="2840" height="970" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Product_di" bpmnElement="Lane_Product" isHorizontal="true">
+        <dc:Bounds x="150" y="80" width="2810" height="150" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Data_di" bpmnElement="Lane_Data" isHorizontal="true">
+        <dc:Bounds x="150" y="230" width="2810" height="150" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_ML_di" bpmnElement="Lane_ML" isHorizontal="true">
+        <dc:Bounds x="150" y="380" width="2810" height="150" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_QA_di" bpmnElement="Lane_QA" isHorizontal="true">
+        <dc:Bounds x="150" y="530" width="2810" height="150" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Approver_di" bpmnElement="Lane_Approver" isHorizontal="true">
+        <dc:Bounds x="150" y="680" width="2810" height="150" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_MLOps_di" bpmnElement="Lane_MLOps" isHorizontal="true">
+        <dc:Bounds x="150" y="830" width="2810" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Start_ModelRequest_di" bpmnElement="Start_ModelRequest">
+        <dc:Bounds x="212" y="137" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="180" y="178" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_DefineGoal_di" bpmnElement="Task_DefineGoal">
+        <dc:Bounds x="320" y="115" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CollectData_di" bpmnElement="Task_CollectData">
+        <dc:Bounds x="470" y="265" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_VersionData_di" bpmnElement="Task_VersionData">
+        <dc:Bounds x="620" y="265" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_FineTune_di" bpmnElement="Task_FineTune">
+        <dc:Bounds x="770" y="415" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Evaluate_di" bpmnElement="Task_Evaluate">
+        <dc:Bounds x="920" y="415" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Metrics_di" bpmnElement="Gw_Metrics" isMarkerVisible="true">
+        <dc:Bounds x="1075" y="430" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1050" y="485" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Fairness_di" bpmnElement="Task_Fairness">
+        <dc:Bounds x="1180" y="565" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Fairness_di" bpmnElement="Gw_Fairness" isMarkerVisible="true">
+        <dc:Bounds x="1335" y="580" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1315" y="533" width="90" height="42" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Reproduce_di" bpmnElement="Task_Reproduce">
+        <dc:Bounds x="1440" y="565" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_UpdateCard_di" bpmnElement="Task_UpdateCard">
+        <dc:Bounds x="1590" y="415" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_TechReview_di" bpmnElement="Task_TechReview">
+        <dc:Bounds x="1740" y="715" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_TechReview_di" bpmnElement="Gw_TechReview" isMarkerVisible="true">
+        <dc:Bounds x="1895" y="730" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1875" y="697" width="90" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_BusinessApproval_di" bpmnElement="Task_BusinessApproval">
+        <dc:Bounds x="2000" y="115" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Business_di" bpmnElement="Gw_Business" isMarkerVisible="true">
+        <dc:Bounds x="2155" y="130" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2130" y="185" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Deploy_di" bpmnElement="Task_Deploy">
+        <dc:Bounds x="2260" y="865" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Monitor_di" bpmnElement="Task_Monitor">
+        <dc:Bounds x="2410" y="865" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Monitor_di" bpmnElement="Gw_Monitor" isMarkerVisible="true">
+        <dc:Bounds x="2575" y="880" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2505" y="935" width="90" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Timer_NextCheck_di" bpmnElement="Timer_NextCheck">
+        <dc:Bounds x="2512" y="982" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2480" y="1023" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Call_Retraining_di" bpmnElement="Call_Retraining">
+        <dc:Bounds x="2690" y="865" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Decommission_di" bpmnElement="Task_Decommission">
+        <dc:Bounds x="2690" y="115" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Decommissioned_di" bpmnElement="End_Decommissioned">
+        <dc:Bounds x="2862" y="137" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2830" y="178" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Note_Retraining_di" bpmnElement="Note_Retraining">
+        <dc:Bounds x="2800" y="985" width="150" height="45" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Note_Approval_di" bpmnElement="Note_Approval">
+        <dc:Bounds x="1480" y="700" width="220" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_01_di" bpmnElement="Flow_01">
+        <di:waypoint x="248" y="155" />
+        <di:waypoint x="320" y="155" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_02_di" bpmnElement="Flow_02">
+        <di:waypoint x="420" y="155" />
+        <di:waypoint x="520" y="155" />
+        <di:waypoint x="520" y="265" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_03_di" bpmnElement="Flow_03">
+        <di:waypoint x="570" y="305" />
+        <di:waypoint x="620" y="305" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_04_di" bpmnElement="Flow_04">
+        <di:waypoint x="720" y="305" />
+        <di:waypoint x="745" y="305" />
+        <di:waypoint x="745" y="455" />
+        <di:waypoint x="770" y="455" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_05_di" bpmnElement="Flow_05">
+        <di:waypoint x="870" y="455" />
+        <di:waypoint x="920" y="455" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_06_di" bpmnElement="Flow_06">
+        <di:waypoint x="1020" y="455" />
+        <di:waypoint x="1075" y="455" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_07_di" bpmnElement="Flow_07">
+        <di:waypoint x="1125" y="455" />
+        <di:waypoint x="1230" y="455" />
+        <di:waypoint x="1230" y="565" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1105" y="437" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_08_di" bpmnElement="Flow_08">
+        <di:waypoint x="1100" y="430" />
+        <di:waypoint x="1100" y="395" />
+        <di:waypoint x="850" y="395" />
+        <di:waypoint x="850" y="415" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1080" y="403" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_09_di" bpmnElement="Flow_09">
+        <di:waypoint x="1280" y="605" />
+        <di:waypoint x="1335" y="605" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_10_di" bpmnElement="Flow_10">
+        <di:waypoint x="1385" y="605" />
+        <di:waypoint x="1440" y="605" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1367" y="587" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_11_di" bpmnElement="Flow_11">
+        <di:waypoint x="1360" y="630" />
+        <di:waypoint x="1360" y="665" />
+        <di:waypoint x="540" y="665" />
+        <di:waypoint x="540" y="345" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="880" y="633" width="90" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_12_di" bpmnElement="Flow_12">
+        <di:waypoint x="1540" y="605" />
+        <di:waypoint x="1640" y="605" />
+        <di:waypoint x="1640" y="495" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_13_di" bpmnElement="Flow_13">
+        <di:waypoint x="1690" y="455" />
+        <di:waypoint x="1790" y="455" />
+        <di:waypoint x="1790" y="715" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_14_di" bpmnElement="Flow_14">
+        <di:waypoint x="1840" y="755" />
+        <di:waypoint x="1895" y="755" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_15_di" bpmnElement="Flow_15">
+        <di:waypoint x="1945" y="755" />
+        <di:waypoint x="2050" y="755" />
+        <di:waypoint x="2050" y="195" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1925" y="737" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_16_di" bpmnElement="Flow_16">
+        <di:waypoint x="1920" y="780" />
+        <di:waypoint x="1920" y="815" />
+        <di:waypoint x="800" y="815" />
+        <di:waypoint x="800" y="495" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1200" y="783" width="90" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_17_di" bpmnElement="Flow_17">
+        <di:waypoint x="2100" y="155" />
+        <di:waypoint x="2155" y="155" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_18_di" bpmnElement="Flow_18">
+        <di:waypoint x="2205" y="155" />
+        <di:waypoint x="2310" y="155" />
+        <di:waypoint x="2310" y="865" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2185" y="137" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_19_di" bpmnElement="Flow_19">
+        <di:waypoint x="2180" y="130" />
+        <di:waypoint x="2180" y="95" />
+        <di:waypoint x="370" y="95" />
+        <di:waypoint x="370" y="115" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1100" y="99" width="90" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_20_di" bpmnElement="Flow_20">
+        <di:waypoint x="2360" y="905" />
+        <di:waypoint x="2410" y="905" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_21_di" bpmnElement="Flow_21">
+        <di:waypoint x="2510" y="905" />
+        <di:waypoint x="2575" y="905" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_22_di" bpmnElement="Flow_22">
+        <di:waypoint x="2625" y="905" />
+        <di:waypoint x="2690" y="905" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2612" y="887" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_23_di" bpmnElement="Flow_23">
+        <di:waypoint x="2740" y="865" />
+        <di:waypoint x="2740" y="845" />
+        <di:waypoint x="2460" y="845" />
+        <di:waypoint x="2460" y="865" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_24_di" bpmnElement="Flow_24">
+        <di:waypoint x="2600" y="930" />
+        <di:waypoint x="2600" y="1000" />
+        <di:waypoint x="2548" y="1000" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2585" y="955" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_25_di" bpmnElement="Flow_25">
+        <di:waypoint x="2512" y="1000" />
+        <di:waypoint x="2480" y="1000" />
+        <di:waypoint x="2480" y="945" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_26_di" bpmnElement="Flow_26">
+        <di:waypoint x="2600" y="880" />
+        <di:waypoint x="2600" y="155" />
+        <di:waypoint x="2690" y="155" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2620" y="460" width="90" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_27_di" bpmnElement="Flow_27">
+        <di:waypoint x="2790" y="155" />
+        <di:waypoint x="2862" y="155" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Note_Retraining_assoc_di" bpmnElement="Note_Retraining_assoc">
+        <di:waypoint x="2790" y="930" />
+        <di:waypoint x="2850" y="990" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Note_Approval_assoc_di" bpmnElement="Note_Approval_assoc">
+        <di:waypoint x="1740" y="740" />
+        <di:waypoint x="1700" y="730" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
