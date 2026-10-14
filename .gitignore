@@ -36,6 +36,7 @@ data/*
 models/
 checkpoints/
 outputs/
+*.log
 mlruns/
 wandb/
 *.safetensors

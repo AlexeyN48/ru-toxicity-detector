@@ -1,0 +1,26 @@
+{
+  "dataset": "Russian Language Toxic Comments",
+  "source": "https://www.kaggle.com/datasets/blackmoon/russian-language-toxic-comments",
+  "license": "GPL-2.0",
+  "data_version": "v1",
+  "raw_file": "labeled.csv",
+  "raw_sha256": "25e75c5b98b82bff4c4f987f452c7eea9735b83744b43bbd31187c3fc792e18b",
+  "rows_after_cleaning": 14155,
+  "toxic_share": 0.3339,
+  "seed": 42,
+  "splits": {
+    "train": {
+      "rows": 9908,
+      "toxic": 3308
+    },
+    "val": {
+      "rows": 2123,
+      "toxic": 709
+    },
+    "test": {
+      "rows": 2124,
+      "toxic": 709
+    }
+  },
+  "created_at": "2026-10-14T04:58:26Z"
+}
