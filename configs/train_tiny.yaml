@@ -1,0 +1,12 @@
+# Baseline: rubert-tiny2 — small model to measure the gain from model size
+run_name: rubert-tiny2
+model_name: cointegrated/rubert-tiny2
+max_length: 128
+epochs: 5
+learning_rate: 5.0e-5
+batch_size: 64
+weight_decay: 0.01
+warmup_ratio: 0.1
+early_stopping_patience: 2
+fp16: true
+seed: 42
