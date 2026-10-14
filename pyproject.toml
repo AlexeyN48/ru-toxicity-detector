@@ -17,13 +17,23 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# torch with CUDA is installed separately, see README
+train = [
+    "accelerate>=1.0",
+    "torch>=2.4",
+    "transformers>=5.0",
+]
 dev = [
     "pre-commit>=4.0",
+    "pytest>=8.0",
     "ruff>=0.17",
 ]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 # ---------------------------------------------------------------- ruff
 [tool.ruff]
