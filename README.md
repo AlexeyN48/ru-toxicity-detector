@@ -25,25 +25,22 @@
 
 ## Как запустить
 
-Нужен Python 3.11+. Для обучения желательна видеокарта NVIDIA, но всё работает и на CPU (медленнее).
+Зависимости ставятся через [uv](https://docs.astral.sh/uv/), точные версии зафиксированы в
+`uv.lock`. Для обучения желательна видеокарта NVIDIA: на Windows и Linux uv сам поставит
+PyTorch с CUDA 13.0. Всё работает и на CPU, только медленнее.
 
 ```bash
-python -m venv .venv
-# Windows: .venv\Scripts\activate    Linux/macOS: source .venv/bin/activate
-
-# PyTorch с CUDA (для CPU можно просто: pip install torch)
-pip install torch --index-url https://download.pytorch.org/whl/cu130
-pip install -e ".[train,dev]"
+uv sync --all-extras                                             # окружение: обучение, демо, dev
 ```
 
 ```bash
-python -m toxicity.data prepare                           # скачать и разбить данные
-python -m toxicity.train --config configs/train_tiny.yaml # baseline, ~1 мин на GPU
-python -m toxicity.train --config configs/train_base.yaml # основная модель, ~3 мин на GPU
-python -m toxicity.augment                                # data v2 для fairness
-python -m toxicity.train --config configs/train_base_aug.yaml
-python -m toxicity.predict "Ты молодец, спасибо!" "Какой же ты идиот"
-pytest                                                    # тесты
+uv run python -m toxicity.data prepare                           # скачать и разбить данные
+uv run python -m toxicity.train --config configs/train_tiny.yaml # baseline, ~1 мин на GPU
+uv run python -m toxicity.train --config configs/train_base.yaml # основная модель, ~3 мин на GPU
+uv run python -m toxicity.augment                                # data v2 для fairness
+uv run python -m toxicity.train --config configs/train_base_aug.yaml
+uv run python -m toxicity.predict "Ты молодец, спасибо!" "Какой же ты идиот"
+uv run pytest                                                    # тесты
 ```
 
 После обучения модель сохраняется в `models/<run_name>/` (не в git), а метрики и
@@ -52,13 +49,29 @@ fairness-отчёт — в `reports/<run_name>/` (`train.json`, `metrics.json`, 
 ### Веб-демо
 
 ```bash
-pip install -e ".[demo]"
-python -m toxicity.app        # страница откроется сама (обычно http://127.0.0.1:7860)
+uv run python -m toxicity.app   # страница откроется сама (обычно http://127.0.0.1:7860)
 ```
 
 Вводим комментарий — модель показывает вердикт «токсичный / нормальный» и вероятность.
 Демо работает только локально: сервер слушает `127.0.0.1`, публичная ссылка Gradio
 выключена, телеметрия отключена, текст никуда не отправляется.
+
+## Инструменты и стандарты
+
+| Что | Чем | Зачем |
+|---|---|---|
+| Окружение и версии | `uv` + `uv.lock` + `.python-version` | у всей команды и в CI одинаковые версии библиотек |
+| Форматтер | `ruff format` | единое оформление кода |
+| Линтер | `ruff check` | неиспользуемые импорты, неизвестные имена, типичные ошибки |
+| Проверки перед коммитом | `pre-commit` | ruff, пробелы, YAML/TOML, большие файлы, ключи, актуальность `uv.lock` |
+| CI | GitHub Actions | те же проверки и тесты на каждый Pull Request |
+| Тесты | `pytest` | данные, метрики, fairness, аугментация |
+| Документация модели | [Model Card](docs/MODEL_CARD.md) | назначение, данные, качество, ограничения, fairness |
+
+Рефакторинг под эти стандарты: код разложен по модулям с одной задачей каждый
+(`src/toxicity/`), параметры экспериментов вынесены из кода в YAML-конфиги, данные
+версионируются через манифест с sha256, логика метрик и fairness отделена от PyTorch и
+покрыта тестами, результаты сохраняются в `reports/` в машиночитаемом виде.
 
 ## Структура репозитория
 
@@ -79,7 +92,10 @@ python -m toxicity.app        # страница откроется сама (о
 │   ├── fairness.py   # Subgroup / BPSN / BNSP AUC, шаблонный тест-сет
 │   ├── inference.py  # загрузка модели и скоринг
 │   └── predict.py    # предсказание из командной строки
-└── tests/
+├── tests/
+├── pyproject.toml    # зависимости и настройки ruff / pytest / uv
+├── uv.lock           # точные версии всех библиотек
+└── .python-version   # версия Python для uv
 ```
 
 ## Документация
