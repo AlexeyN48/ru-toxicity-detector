@@ -1,0 +1,141 @@
+{
+  "overall_roc_auc": 0.9752864483396213,
+  "overall_fpr": 0.08480565371024736,
+  "threshold": 0.16231364011764526,
+  "criteria": {
+    "max_auc_gap": 0.05,
+    "max_fpr_gap": 0.05,
+    "max_template_fpr": 0.1,
+    "min_subgroup_size": 30
+  },
+  "subgroups": {
+    "ethnicity": {
+      "n": 48,
+      "n_toxic": 30,
+      "reliable": true,
+      "subgroup_auc": 0.9629629629629629,
+      "subgroup_auc_ci95": [
+        0.9036951447245566,
+        1.0
+      ],
+      "bpsn_auc": 0.9176894125347733,
+      "bnsp_auc": 0.991171558100692,
+      "fpr": 0.2777777777777778,
+      "fnr": 0.0,
+      "title": "Национальность и этническая принадлежность",
+      "template_fpr": 0.7333333333333333,
+      "checks": {
+        "template_fpr": false,
+        "subgroup_auc": true,
+        "bpsn_auc": false,
+        "fpr_gap": false
+      }
+    },
+    "religion": {
+      "n": 4,
+      "n_toxic": 2,
+      "reliable": false,
+      "subgroup_auc": 0.75,
+      "subgroup_auc_ci95": [
+        0.0,
+        1.0
+      ],
+      "bpsn_auc": 0.4833804809052334,
+      "bnsp_auc": 0.9982307147912243,
+      "fpr": 1.0,
+      "fnr": 0.0,
+      "title": "Религия",
+      "template_fpr": 0.825,
+      "checks": {
+        "template_fpr": false
+      }
+    },
+    "gender": {
+      "n": 43,
+      "n_toxic": 12,
+      "reliable": true,
+      "subgroup_auc": 0.9408602150537634,
+      "subgroup_auc_ci95": [
+        0.8398050887021475,
+        1.0
+      ],
+      "bpsn_auc": 0.9793354005646318,
+      "bnsp_auc": 0.9382827552986512,
+      "fpr": 0.0967741935483871,
+      "fnr": 0.16666666666666666,
+      "title": "Пол",
+      "template_fpr": 0.35,
+      "checks": {
+        "template_fpr": false,
+        "subgroup_auc": true,
+        "bpsn_auc": true,
+        "fpr_gap": true
+      }
+    },
+    "orientation": {
+      "n": 3,
+      "n_toxic": 3,
+      "reliable": false,
+      "subgroup_auc": null,
+      "subgroup_auc_ci95": null,
+      "bpsn_auc": null,
+      "bnsp_auc": 0.9891637220259127,
+      "fpr": null,
+      "fnr": 0.0,
+      "title": "Сексуальная ориентация и гендерная идентичность",
+      "template_fpr": 1.0,
+      "checks": {
+        "template_fpr": false
+      }
+    },
+    "disability": {
+      "n": 8,
+      "n_toxic": 4,
+      "reliable": false,
+      "subgroup_auc": 0.8125,
+      "subgroup_auc_ci95": [
+        0.39999999999999997,
+        1.0
+      ],
+      "bpsn_auc": 0.9258865248226951,
+      "bnsp_auc": 0.9691708008504607,
+      "fpr": 0.5,
+      "fnr": 0.0,
+      "title": "Инвалидность и здоровье",
+      "template_fpr": 0.36,
+      "checks": {
+        "template_fpr": false
+      }
+    },
+    "age": {
+      "n": 14,
+      "n_toxic": 9,
+      "reliable": false,
+      "subgroup_auc": 0.9555555555555556,
+      "subgroup_auc_ci95": [
+        0.8,
+        1.0
+      ],
+      "bpsn_auc": 0.9561428571428571,
+      "bnsp_auc": 0.9797478329393223,
+      "fpr": 0.2,
+      "fnr": 0.1111111111111111,
+      "title": "Возраст",
+      "template_fpr": 0.2,
+      "checks": {
+        "template_fpr": false
+      }
+    }
+  },
+  "failures": [
+    "ethnicity.template_fpr",
+    "ethnicity.bpsn_auc",
+    "ethnicity.fpr_gap",
+    "religion.template_fpr",
+    "gender.template_fpr",
+    "orientation.template_fpr",
+    "disability.template_fpr",
+    "age.template_fpr"
+  ],
+  "passed": false
+}

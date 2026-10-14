@@ -1,0 +1,51 @@
+{
+  "config": {
+    "run_name": "rubert-tiny2",
+    "model_name": "cointegrated/rubert-tiny2",
+    "max_length": 128,
+    "epochs": 5,
+    "learning_rate": 5e-05,
+    "batch_size": 64,
+    "weight_decay": 0.01,
+    "warmup_ratio": 0.1,
+    "early_stopping_patience": 2,
+    "fp16": true,
+    "seed": 42
+  },
+  "train_minutes": 0.81,
+  "device": "NVIDIA GeForce RTX 4060",
+  "best_val_roc_auc": 0.9681464620368948,
+  "epochs_run": 5,
+  "history": [
+    {
+      "eval_loss": 0.24027034640312195,
+      "eval_roc_auc": 0.963549075036458,
+      "eval_pr_auc": 0.9241878080095766,
+      "epoch": 1.0
+    },
+    {
+      "eval_loss": 0.22182035446166992,
+      "eval_roc_auc": 0.9669026040222398,
+      "eval_pr_auc": 0.9306046328155827,
+      "epoch": 2.0
+    },
+    {
+      "eval_loss": 0.22583197057247162,
+      "eval_roc_auc": 0.9675010922409992,
+      "eval_pr_auc": 0.9317010384749904,
+      "epoch": 3.0
+    },
+    {
+      "eval_loss": 0.2313489019870758,
+      "eval_roc_auc": 0.9681464620368948,
+      "eval_pr_auc": 0.9326483333746161,
+      "epoch": 4.0
+    },
+    {
+      "eval_loss": 0.24025608599185944,
+      "eval_roc_auc": 0.9676103163409229,
+      "eval_pr_auc": 0.9314815459116377,
+      "epoch": 5.0
+    }
+  ]
+}

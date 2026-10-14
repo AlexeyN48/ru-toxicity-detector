@@ -1,0 +1,18 @@
+{
+  "roc_auc": 0.9752864483396213,
+  "pr_auc": 0.9506966563769002,
+  "f1_toxic": 0.8909698996655518,
+  "f1_macro": 0.9158808815436368,
+  "precision_toxic": 0.8473282442748091,
+  "recall_toxic": 0.9393511988716502,
+  "threshold": 0.16231364011764526,
+  "n": 2124,
+  "latency_ms": 9.491375499637797,
+  "targets_met": {
+    "roc_auc": true,
+    "pr_auc": true,
+    "f1_toxic": true,
+    "recall_toxic": true,
+    "precision_toxic": true
+  }
+}

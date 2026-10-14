@@ -1,0 +1,39 @@
+{
+  "config": {
+    "run_name": "ruBert-base",
+    "model_name": "ai-forever/ruBert-base",
+    "max_length": 128,
+    "epochs": 3,
+    "learning_rate": 2e-05,
+    "batch_size": 32,
+    "weight_decay": 0.01,
+    "warmup_ratio": 0.1,
+    "early_stopping_patience": 2,
+    "fp16": true,
+    "seed": 42
+  },
+  "train_minutes": 2.65,
+  "device": "NVIDIA GeForce RTX 4060",
+  "best_val_roc_auc": 0.9735378434075526,
+  "epochs_run": 3,
+  "history": [
+    {
+      "eval_loss": 0.1986333280801773,
+      "eval_roc_auc": 0.9735378434075526,
+      "eval_pr_auc": 0.9464453257592202,
+      "epoch": 1.0
+    },
+    {
+      "eval_loss": 0.20325888693332672,
+      "eval_roc_auc": 0.9729523224335328,
+      "eval_pr_auc": 0.9480378302223967,
+      "epoch": 2.0
+    },
+    {
+      "eval_loss": 0.2599325478076935,
+      "eval_roc_auc": 0.9705628582201358,
+      "eval_pr_auc": 0.9474459936710912,
+      "epoch": 3.0
+    }
+  ]
+}
