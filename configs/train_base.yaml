@@ -1,0 +1,12 @@
+# Main model: ruBert-base (see docs/MODEL_CARD.md, section 1)
+run_name: ruBert-base
+model_name: ai-forever/ruBert-base
+max_length: 128
+epochs: 3
+learning_rate: 2.0e-5
+batch_size: 32
+weight_decay: 0.01
+warmup_ratio: 0.1
+early_stopping_patience: 2
+fp16: true
+seed: 42
