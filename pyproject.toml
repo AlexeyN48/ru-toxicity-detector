@@ -36,6 +36,16 @@ dev = [
 [tool.setuptools.packages.find]
 where = ["src"]
 
+# ---------------------------------------------------------------- uv
+# PyTorch with CUDA 13.0 on Windows/Linux; macOS gets the regular build from PyPI.
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu130", marker = "sys_platform == 'win32' or sys_platform == 'linux'" }]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
