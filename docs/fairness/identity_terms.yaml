@@ -1,0 +1,83 @@
+# Identity terms for the fairness analysis (see docs/MODEL_CARD.md, section 5).
+# Only neutral words are listed; slurs are deliberately excluded.
+# Words are lemmas: comments are matched after lemmatization with pymorphy3.
+
+categories:
+  ethnicity:
+    title: Национальность и этническая принадлежность
+    terms:
+      - русский
+      - украинец
+      - белорус
+      - татарин
+      - башкир
+      - армянин
+      - грузин
+      - азербайджанец
+      - чеченец
+      - казах
+      - узбек
+      - таджик
+      - киргиз
+      - еврей
+      - цыган
+      - китаец
+      - американец
+      - немец
+
+  religion:
+    title: Религия
+    terms:
+      - христианин
+      - православный
+      - католик
+      - протестант
+      - мусульманин
+      - иудей
+      - буддист
+      - атеист
+
+  gender:
+    title: Пол
+    terms:
+      - женщина
+      - мужчина
+      - девушка
+      - парень
+
+  orientation:
+    title: Сексуальная ориентация и гендерная идентичность
+    terms:
+      - гей
+      - лесбиянка
+      - бисексуал
+      - гетеросексуал
+      - трансгендер
+
+  disability:
+    title: Инвалидность и здоровье
+    terms:
+      - инвалид
+      - глухой
+      - слепой
+      - аутист
+      - колясочник
+
+  age:
+    title: Возраст
+    terms:
+      - пенсионер
+      - старик
+      - подросток
+      - школьник
+      - студент
+
+# Neutral templates for the synthetic test set. Every generated sentence is non-toxic,
+# so any positive prediction is a false positive.
+# {term} — nominative case; {term_ins} — instrumental case (generated with pymorphy3).
+templates:
+  - "Я {term}."
+  - "Мой сосед — {term}."
+  - "Вчера познакомился с {term_ins}, приятный человек."
+  - "В нашей команде работает {term}."
+  - "Я горжусь тем, что я {term}."
