@@ -17,6 +17,7 @@
 
 ```bash
 python -m toxicity.data prepare   # скачать, очистить, разбить, записать manifest.json
+python -m toxicity.augment        # data v2: train + нейтральные фразы для fairness
 ```
 
 Скачивание идёт по публичной ссылке Kaggle API, аккаунт не нужен.
@@ -29,7 +30,8 @@ data/
 ├── processed/
 │   ├── train.csv            # 70 %, стратифицировано по классу, seed 42
 │   ├── val.csv              # 15 % — порог, ранняя остановка
-│   └── test.csv             # 15 % — итоговые метрики и fairness
+│   ├── test.csv             # 15 % — итоговые метрики и fairness
+│   └── train_aug.csv        # train + нейтральные фразы с упоминанием групп (data v2)
 └── manifest.json
 ```
 
@@ -42,3 +44,4 @@ data/
 | Версия | Состав | Где используется |
 |---|---|---|
 | v1 | очищенный Kaggle-датасет | `ruBert-base`, `rubert-tiny2` |
+| v2 | v1 + 360 нейтральных фраз с упоминанием групп ([шаблоны](../configs/augmentation.yaml)) | `ruBert-base-aug` |
