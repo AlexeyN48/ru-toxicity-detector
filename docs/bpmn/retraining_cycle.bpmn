@@ -1,0 +1,536 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_RetrainingCycle" targetNamespace="https://github.com/ru-toxicity-detector" exporter="ru-toxicity-detector" exporterVersion="1.0">
+  <bpmn:error id="Error_TrainingFailed" name="Training failed" errorCode="TRAINING_FAILED" />
+  <bpmn:collaboration id="Collaboration_RetrainingCycle">
+    <bpmn:participant id="Participant_Retraining" name="Retraining-цикл модели ru-toxicity-detector" processRef="Process_RetrainingCycle" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_RetrainingCycle" name="Retraining-цикл" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_Retraining">
+      <bpmn:lane id="Lane_Monitoring" name="Мониторинг (система)">
+        <bpmn:flowNodeRef>Start_Drift</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_DriftReport</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Pipeline" name="ML-пайплайн (система)">
+        <bpmn:flowNodeRef>Task_CollectData</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Retrain</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_Split</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_EvalChampion</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_EvalChallenger</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_Join</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_Fairness</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Auction</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_Winner</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Deploy</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Archive</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_Merge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Boundary_TrainError</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Validator" name="Валидатор: ML-инженер + модератор">
+        <bpmn:flowNodeRef>Task_Validate</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_Approved</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Boundary_Timeout</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Telegram" name="Telegram-бот">
+        <bpmn:flowNodeRef>Send_DriftDetected</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Send_Result</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Done</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Send_TrainError</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_TrainError</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Send_FairnessFail</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_FairnessFail</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Send_Reminder</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Reminder</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Send_Rejected</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Rejected</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start_Drift" name="Дрифт выше порога">
+      <bpmn:outgoing>Flow_01</bpmn:outgoing>
+      <bpmn:conditionalEventDefinition id="Start_Drift_def">
+        <bpmn:condition xsi:type="bpmn:tFormalExpression">${psi_scores &gt; 0.2 || moderator_disagreement_7d &gt; 0.15}</bpmn:condition>
+      </bpmn:conditionalEventDefinition>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="Task_DriftReport" name="Сформировать отчёт о дрифте">
+      <bpmn:incoming>Flow_01</bpmn:incoming>
+      <bpmn:outgoing>Flow_02</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sendTask id="Send_DriftDetected" name="Telegram: дрифт, запущен retraining">
+      <bpmn:incoming>Flow_02</bpmn:incoming>
+      <bpmn:outgoing>Flow_03</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:serviceTask id="Task_CollectData" name="Собрать разметку модераторов, датасет vN+1">
+      <bpmn:incoming>Flow_03</bpmn:incoming>
+      <bpmn:outgoing>Flow_04</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Task_Retrain" name="Retraining: дообучить challenger">
+      <bpmn:incoming>Flow_04</bpmn:incoming>
+      <bpmn:outgoing>Flow_05</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:parallelGateway id="Gw_Split">
+      <bpmn:incoming>Flow_05</bpmn:incoming>
+      <bpmn:outgoing>Flow_06</bpmn:outgoing>
+      <bpmn:outgoing>Flow_07</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:serviceTask id="Task_EvalChampion" name="Оценить champion на hold-out">
+      <bpmn:incoming>Flow_06</bpmn:incoming>
+      <bpmn:outgoing>Flow_08</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Task_EvalChallenger" name="Оценить challenger: метрики, fairness">
+      <bpmn:incoming>Flow_07</bpmn:incoming>
+      <bpmn:outgoing>Flow_09</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:parallelGateway id="Gw_Join">
+      <bpmn:incoming>Flow_08</bpmn:incoming>
+      <bpmn:incoming>Flow_09</bpmn:incoming>
+      <bpmn:outgoing>Flow_10</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:exclusiveGateway id="Gw_Fairness" name="Challenger прошёл fairness?">
+      <bpmn:incoming>Flow_10</bpmn:incoming>
+      <bpmn:outgoing>Flow_11</bpmn:outgoing>
+      <bpmn:outgoing>Flow_12</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Task_Validate" name="Валидация challenger человеком">
+      <bpmn:incoming>Flow_11</bpmn:incoming>
+      <bpmn:outgoing>Flow_13</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gw_Approved" name="Одобрено?">
+      <bpmn:incoming>Flow_13</bpmn:incoming>
+      <bpmn:outgoing>Flow_14</bpmn:outgoing>
+      <bpmn:outgoing>Flow_15</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:businessRuleTask id="Task_Auction" name="Аукцион по AUC: champion vs challenger">
+      <bpmn:incoming>Flow_14</bpmn:incoming>
+      <bpmn:outgoing>Flow_16</bpmn:outgoing>
+    </bpmn:businessRuleTask>
+    <bpmn:exclusiveGateway id="Gw_Winner" name="Победитель аукциона">
+      <bpmn:incoming>Flow_16</bpmn:incoming>
+      <bpmn:outgoing>Flow_17</bpmn:outgoing>
+      <bpmn:outgoing>Flow_18</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_Deploy" name="Деплой challenger: canary → prod">
+      <bpmn:incoming>Flow_17</bpmn:incoming>
+      <bpmn:outgoing>Flow_19</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Task_Archive" name="Оставить champion, challenger в архив">
+      <bpmn:incoming>Flow_18</bpmn:incoming>
+      <bpmn:outgoing>Flow_20</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gw_Merge">
+      <bpmn:incoming>Flow_19</bpmn:incoming>
+      <bpmn:incoming>Flow_20</bpmn:incoming>
+      <bpmn:outgoing>Flow_21</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sendTask id="Send_Result" name="Telegram: итог аукциона">
+      <bpmn:incoming>Flow_21</bpmn:incoming>
+      <bpmn:outgoing>Flow_22</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:endEvent id="End_Done" name="Цикл завершён">
+      <bpmn:incoming>Flow_22</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sendTask id="Send_TrainError" name="Telegram: ошибка обучения">
+      <bpmn:incoming>Flow_23</bpmn:incoming>
+      <bpmn:outgoing>Flow_24</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:endEvent id="End_TrainError" name="Обучение не удалось, champion остаётся">
+      <bpmn:incoming>Flow_24</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sendTask id="Send_FairnessFail" name="Telegram: challenger не прошёл fairness">
+      <bpmn:incoming>Flow_12</bpmn:incoming>
+      <bpmn:outgoing>Flow_25</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:endEvent id="End_FairnessFail" name="Champion остаётся">
+      <bpmn:incoming>Flow_25</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sendTask id="Send_Reminder" name="Telegram: напоминание валидатору">
+      <bpmn:incoming>Flow_26</bpmn:incoming>
+      <bpmn:outgoing>Flow_27</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:endEvent id="End_Reminder" name="Напоминание отправлено">
+      <bpmn:incoming>Flow_27</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sendTask id="Send_Rejected" name="Telegram: challenger отклонён">
+      <bpmn:incoming>Flow_15</bpmn:incoming>
+      <bpmn:outgoing>Flow_28</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:endEvent id="End_Rejected" name="Champion остаётся">
+      <bpmn:incoming>Flow_28</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:boundaryEvent id="Boundary_TrainError" name="Ошибка обучения" attachedToRef="Task_Retrain">
+      <bpmn:outgoing>Flow_23</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="Boundary_TrainError_def" errorRef="Error_TrainingFailed" />
+    </bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="Boundary_Timeout" name="24 ч без решения" cancelActivity="false" attachedToRef="Task_Validate">
+      <bpmn:outgoing>Flow_26</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Boundary_Timeout_def">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT24H</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="Flow_01" sourceRef="Start_Drift" targetRef="Task_DriftReport" />
+    <bpmn:sequenceFlow id="Flow_02" sourceRef="Task_DriftReport" targetRef="Send_DriftDetected" />
+    <bpmn:sequenceFlow id="Flow_03" sourceRef="Send_DriftDetected" targetRef="Task_CollectData" />
+    <bpmn:sequenceFlow id="Flow_04" sourceRef="Task_CollectData" targetRef="Task_Retrain" />
+    <bpmn:sequenceFlow id="Flow_05" sourceRef="Task_Retrain" targetRef="Gw_Split" />
+    <bpmn:sequenceFlow id="Flow_06" sourceRef="Gw_Split" targetRef="Task_EvalChampion" />
+    <bpmn:sequenceFlow id="Flow_07" sourceRef="Gw_Split" targetRef="Task_EvalChallenger" />
+    <bpmn:sequenceFlow id="Flow_08" sourceRef="Task_EvalChampion" targetRef="Gw_Join" />
+    <bpmn:sequenceFlow id="Flow_09" sourceRef="Task_EvalChallenger" targetRef="Gw_Join" />
+    <bpmn:sequenceFlow id="Flow_10" sourceRef="Gw_Join" targetRef="Gw_Fairness" />
+    <bpmn:sequenceFlow id="Flow_11" name="да" sourceRef="Gw_Fairness" targetRef="Task_Validate">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${challenger_fairness_passed}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_12" name="нет" sourceRef="Gw_Fairness" targetRef="Send_FairnessFail">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${!challenger_fairness_passed}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_13" sourceRef="Task_Validate" targetRef="Gw_Approved" />
+    <bpmn:sequenceFlow id="Flow_14" name="да" sourceRef="Gw_Approved" targetRef="Task_Auction">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${approved}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_15" name="нет" sourceRef="Gw_Approved" targetRef="Send_Rejected">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${!approved}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_16" sourceRef="Task_Auction" targetRef="Gw_Winner" />
+    <bpmn:sequenceFlow id="Flow_17" name="challenger" sourceRef="Gw_Winner" targetRef="Task_Deploy">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${auc_challenger - auc_champion &gt; 0.005}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_18" name="champion" sourceRef="Gw_Winner" targetRef="Task_Archive">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${auc_challenger - auc_champion &lt;= 0.005}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_19" sourceRef="Task_Deploy" targetRef="Gw_Merge" />
+    <bpmn:sequenceFlow id="Flow_20" sourceRef="Task_Archive" targetRef="Gw_Merge" />
+    <bpmn:sequenceFlow id="Flow_21" sourceRef="Gw_Merge" targetRef="Send_Result" />
+    <bpmn:sequenceFlow id="Flow_22" sourceRef="Send_Result" targetRef="End_Done" />
+    <bpmn:sequenceFlow id="Flow_23" sourceRef="Boundary_TrainError" targetRef="Send_TrainError" />
+    <bpmn:sequenceFlow id="Flow_24" sourceRef="Send_TrainError" targetRef="End_TrainError" />
+    <bpmn:sequenceFlow id="Flow_25" sourceRef="Send_FairnessFail" targetRef="End_FairnessFail" />
+    <bpmn:sequenceFlow id="Flow_26" sourceRef="Boundary_Timeout" targetRef="Send_Reminder" />
+    <bpmn:sequenceFlow id="Flow_27" sourceRef="Send_Reminder" targetRef="End_Reminder" />
+    <bpmn:sequenceFlow id="Flow_28" sourceRef="Send_Rejected" targetRef="End_Rejected" />
+    <bpmn:textAnnotation id="Note_Trigger">
+      <bpmn:text>Триггер: PSI скоров &gt; 0.2 или несогласие модераторов &gt; 15 % за 7 дней</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:association id="Note_Trigger_assoc" associationDirection="None" sourceRef="Start_Drift" targetRef="Note_Trigger" />
+    <bpmn:textAnnotation id="Note_Models">
+      <bpmn:text>Champion — модель в продакшене; challenger — дообученная в этом цикле</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:association id="Note_Models_assoc" associationDirection="None" sourceRef="Task_EvalChampion" targetRef="Note_Models" />
+    <bpmn:textAnnotation id="Note_Auction">
+      <bpmn:text>Challenger побеждает, если его AUC выше на δ = 0.005; иначе остаётся champion</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:association id="Note_Auction_assoc" associationDirection="None" sourceRef="Task_Auction" targetRef="Note_Auction" />
+    <bpmn:textAnnotation id="Note_HITL">
+      <bpmn:text>Human-in-the-loop: без одобрения человека challenger не участвует в аукционе</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:association id="Note_HITL_assoc" associationDirection="None" sourceRef="Task_Validate" targetRef="Note_HITL" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_RetrainingCycle">
+    <bpmndi:BPMNPlane id="Plane_RetrainingCycle" bpmnElement="Collaboration_RetrainingCycle">
+      <bpmndi:BPMNShape id="Participant_Retraining_di" bpmnElement="Participant_Retraining" isHorizontal="true">
+        <dc:Bounds x="120" y="80" width="2280" height="780" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Monitoring_di" bpmnElement="Lane_Monitoring" isHorizontal="true">
+        <dc:Bounds x="150" y="80" width="2250" height="150" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Pipeline_di" bpmnElement="Lane_Pipeline" isHorizontal="true">
+        <dc:Bounds x="150" y="230" width="2250" height="240" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Validator_di" bpmnElement="Lane_Validator" isHorizontal="true">
+        <dc:Bounds x="150" y="470" width="2250" height="170" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Telegram_di" bpmnElement="Lane_Telegram" isHorizontal="true">
+        <dc:Bounds x="150" y="640" width="2250" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Start_Drift_di" bpmnElement="Start_Drift">
+        <dc:Bounds x="202" y="137" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="170" y="178" width="100" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_DriftReport_di" bpmnElement="Task_DriftReport">
+        <dc:Bounds x="290" y="115" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Send_DriftDetected_di" bpmnElement="Send_DriftDetected">
+        <dc:Bounds x="430" y="670" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CollectData_di" bpmnElement="Task_CollectData">
+        <dc:Bounds x="570" y="310" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Retrain_di" bpmnElement="Task_Retrain">
+        <dc:Bounds x="720" y="310" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Split_di" bpmnElement="Gw_Split">
+        <dc:Bounds x="875" y="325" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_EvalChampion_di" bpmnElement="Task_EvalChampion">
+        <dc:Bounds x="970" y="260" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_EvalChallenger_di" bpmnElement="Task_EvalChallenger">
+        <dc:Bounds x="970" y="370" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Join_di" bpmnElement="Gw_Join">
+        <dc:Bounds x="1115" y="325" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Fairness_di" bpmnElement="Gw_Fairness" isMarkerVisible="true">
+        <dc:Bounds x="1225" y="325" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1205" y="278" width="90" height="42" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Validate_di" bpmnElement="Task_Validate">
+        <dc:Bounds x="1340" y="505" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Approved_di" bpmnElement="Gw_Approved" isMarkerVisible="true">
+        <dc:Bounds x="1505" y="520" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1485" y="501" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Auction_di" bpmnElement="Task_Auction">
+        <dc:Bounds x="1620" y="310" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Winner_di" bpmnElement="Gw_Winner" isMarkerVisible="true">
+        <dc:Bounds x="1775" y="325" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1700" y="280" width="90" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Deploy_di" bpmnElement="Task_Deploy">
+        <dc:Bounds x="1880" y="260" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Archive_di" bpmnElement="Task_Archive">
+        <dc:Bounds x="1880" y="370" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Merge_di" bpmnElement="Gw_Merge" isMarkerVisible="true">
+        <dc:Bounds x="2035" y="325" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Send_Result_di" bpmnElement="Send_Result">
+        <dc:Bounds x="2130" y="670" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Done_di" bpmnElement="End_Done">
+        <dc:Bounds x="2162" y="792" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2204" y="796" width="100" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Send_TrainError_di" bpmnElement="Send_TrainError">
+        <dc:Bounds x="720" y="670" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_TrainError_di" bpmnElement="End_TrainError">
+        <dc:Bounds x="752" y="792" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="794" y="796" width="100" height="42" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Send_FairnessFail_di" bpmnElement="Send_FairnessFail">
+        <dc:Bounds x="1200" y="670" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_FairnessFail_di" bpmnElement="End_FairnessFail">
+        <dc:Bounds x="1232" y="792" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1274" y="796" width="100" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Send_Reminder_di" bpmnElement="Send_Reminder">
+        <dc:Bounds x="1340" y="670" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Reminder_di" bpmnElement="End_Reminder">
+        <dc:Bounds x="1372" y="792" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1414" y="796" width="100" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Send_Rejected_di" bpmnElement="Send_Rejected">
+        <dc:Bounds x="1480" y="670" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Rejected_di" bpmnElement="End_Rejected">
+        <dc:Bounds x="1512" y="792" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1554" y="796" width="100" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Boundary_TrainError_di" bpmnElement="Boundary_TrainError">
+        <dc:Bounds x="782" y="372" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="818" y="412" width="90" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Boundary_Timeout_di" bpmnElement="Boundary_Timeout">
+        <dc:Bounds x="1402" y="567" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1424" y="609" width="90" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Note_Trigger_di" bpmnElement="Note_Trigger">
+        <dc:Bounds x="440" y="95" width="260" height="45" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Note_Models_di" bpmnElement="Note_Models">
+        <dc:Bounds x="900" y="95" width="260" height="45" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Note_Auction_di" bpmnElement="Note_Auction">
+        <dc:Bounds x="1600" y="95" width="270" height="45" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Note_HITL_di" bpmnElement="Note_HITL">
+        <dc:Bounds x="880" y="505" width="280" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_01_di" bpmnElement="Flow_01">
+        <di:waypoint x="238" y="155" />
+        <di:waypoint x="290" y="155" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_02_di" bpmnElement="Flow_02">
+        <di:waypoint x="390" y="155" />
+        <di:waypoint x="480" y="155" />
+        <di:waypoint x="480" y="670" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_03_di" bpmnElement="Flow_03">
+        <di:waypoint x="530" y="710" />
+        <di:waypoint x="620" y="710" />
+        <di:waypoint x="620" y="390" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_04_di" bpmnElement="Flow_04">
+        <di:waypoint x="670" y="350" />
+        <di:waypoint x="720" y="350" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_05_di" bpmnElement="Flow_05">
+        <di:waypoint x="820" y="350" />
+        <di:waypoint x="875" y="350" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_06_di" bpmnElement="Flow_06">
+        <di:waypoint x="900" y="325" />
+        <di:waypoint x="900" y="300" />
+        <di:waypoint x="970" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_07_di" bpmnElement="Flow_07">
+        <di:waypoint x="900" y="375" />
+        <di:waypoint x="900" y="410" />
+        <di:waypoint x="970" y="410" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_08_di" bpmnElement="Flow_08">
+        <di:waypoint x="1070" y="300" />
+        <di:waypoint x="1140" y="300" />
+        <di:waypoint x="1140" y="325" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_09_di" bpmnElement="Flow_09">
+        <di:waypoint x="1070" y="410" />
+        <di:waypoint x="1140" y="410" />
+        <di:waypoint x="1140" y="375" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_10_di" bpmnElement="Flow_10">
+        <di:waypoint x="1165" y="350" />
+        <di:waypoint x="1225" y="350" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_11_di" bpmnElement="Flow_11">
+        <di:waypoint x="1275" y="350" />
+        <di:waypoint x="1390" y="350" />
+        <di:waypoint x="1390" y="505" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1260" y="334" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_12_di" bpmnElement="Flow_12">
+        <di:waypoint x="1250" y="375" />
+        <di:waypoint x="1250" y="670" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1220" y="400" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_13_di" bpmnElement="Flow_13">
+        <di:waypoint x="1440" y="545" />
+        <di:waypoint x="1505" y="545" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_14_di" bpmnElement="Flow_14">
+        <di:waypoint x="1555" y="545" />
+        <di:waypoint x="1670" y="545" />
+        <di:waypoint x="1670" y="390" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1540" y="529" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_15_di" bpmnElement="Flow_15">
+        <di:waypoint x="1530" y="570" />
+        <di:waypoint x="1530" y="670" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1500" y="585" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_16_di" bpmnElement="Flow_16">
+        <di:waypoint x="1720" y="350" />
+        <di:waypoint x="1775" y="350" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_17_di" bpmnElement="Flow_17">
+        <di:waypoint x="1800" y="325" />
+        <di:waypoint x="1800" y="300" />
+        <di:waypoint x="1880" y="300" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1795" y="284" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_18_di" bpmnElement="Flow_18">
+        <di:waypoint x="1800" y="375" />
+        <di:waypoint x="1800" y="410" />
+        <di:waypoint x="1880" y="410" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1795" y="414" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_19_di" bpmnElement="Flow_19">
+        <di:waypoint x="1980" y="300" />
+        <di:waypoint x="2060" y="300" />
+        <di:waypoint x="2060" y="325" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_20_di" bpmnElement="Flow_20">
+        <di:waypoint x="1980" y="410" />
+        <di:waypoint x="2060" y="410" />
+        <di:waypoint x="2060" y="375" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_21_di" bpmnElement="Flow_21">
+        <di:waypoint x="2085" y="350" />
+        <di:waypoint x="2180" y="350" />
+        <di:waypoint x="2180" y="670" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_22_di" bpmnElement="Flow_22">
+        <di:waypoint x="2180" y="750" />
+        <di:waypoint x="2180" y="792" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_23_di" bpmnElement="Flow_23">
+        <di:waypoint x="800" y="408" />
+        <di:waypoint x="800" y="670" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_24_di" bpmnElement="Flow_24">
+        <di:waypoint x="770" y="750" />
+        <di:waypoint x="770" y="792" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_25_di" bpmnElement="Flow_25">
+        <di:waypoint x="1250" y="750" />
+        <di:waypoint x="1250" y="792" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_26_di" bpmnElement="Flow_26">
+        <di:waypoint x="1420" y="603" />
+        <di:waypoint x="1420" y="670" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_27_di" bpmnElement="Flow_27">
+        <di:waypoint x="1390" y="750" />
+        <di:waypoint x="1390" y="792" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_28_di" bpmnElement="Flow_28">
+        <di:waypoint x="1530" y="750" />
+        <di:waypoint x="1530" y="792" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Note_Trigger_assoc_di" bpmnElement="Note_Trigger_assoc">
+        <di:waypoint x="220" y="137" />
+        <di:waypoint x="220" y="110" />
+        <di:waypoint x="440" y="110" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Note_Models_assoc_di" bpmnElement="Note_Models_assoc">
+        <di:waypoint x="1020" y="260" />
+        <di:waypoint x="1030" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Note_Auction_assoc_di" bpmnElement="Note_Auction_assoc">
+        <di:waypoint x="1670" y="310" />
+        <di:waypoint x="1700" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Note_HITL_assoc_di" bpmnElement="Note_HITL_assoc">
+        <di:waypoint x="1340" y="535" />
+        <di:waypoint x="1160" y="530" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
