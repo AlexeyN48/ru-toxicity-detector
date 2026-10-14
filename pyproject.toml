@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ru-toxicity-detector"
+version = "0.1.0"
+description = "Toxic comment detection for Russian based on fine-tuned ruBERT"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pre-commit>=4.0",
+    "ruff>=0.17",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# ---------------------------------------------------------------- ruff
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "UP",   # pyupgrade
+    "SIM",  # flake8-simplify
+    "RUF",  # ruff-specific rules
+]
+ignore = [
+    "E501",    # line length is handled by the formatter
+    "RUF001",  # ambiguous unicode in strings: false positives on Cyrillic text
+    "RUF002",  # ambiguous unicode in docstrings
+    "RUF003",  # ambiguous unicode in comments
+]
+
+[tool.ruff.lint.per-file-ignores]
+"notebooks/*" = ["E402"]  # imports in the middle of a notebook are fine
+
+[tool.ruff.format]
+quote-style = "double"
+docstring-code-format = true
