@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# torch with CUDA is installed separately, see README
+# torch with CUDA 13.0 comes from the PyTorch index configured in [tool.uv] below
 train = [
     "accelerate>=1.0",
     "torch>=2.4",
