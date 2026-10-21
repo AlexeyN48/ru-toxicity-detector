@@ -3,7 +3,8 @@
 BPMN-процесс переобучения модели `ru-toxicity-detector` при дрифте: дообучение новой модели,
 валидация человеком, аукцион двух моделей по AUC, деплой лучшей и уведомления в Telegram.
 В схеме жизненного цикла ([LIFECYCLE.md](LIFECYCLE.md)) этот процесс изображён одним
-свёрнутым блоком «Retraining-цикл».
+свёрнутым блоком «Retraining-цикл». Автоматический вариант без обязательной проверки
+человеком, с явными критериями остановки — в [AUTO_RETRAINING.md](AUTO_RETRAINING.md) (ДЗ 3).
 
 - Исходник схемы: [`bpmn/retraining_cycle.bpmn`](bpmn/retraining_cycle.bpmn) — открывается в [bpmn.io](https://demo.bpmn.io/)
 - Картинка: [`bpmn/retraining_cycle.png`](bpmn/retraining_cycle.png)
