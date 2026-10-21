@@ -1,0 +1,647 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_AutoRetraining" targetNamespace="https://github.com/ru-toxicity-detector" exporter="ru-toxicity-detector" exporterVersion="1.0">
+  <bpmn:message id="Msg_NewLabels" name="Новая партия разметки модераторов" />
+  <bpmn:error id="Error_Diverged" name="Training diverged" errorCode="TRAINING_DIVERGED" />
+  <bpmn:collaboration id="Collaboration_AutoRetraining">
+    <bpmn:participant id="Participant_AutoRetraining" name="Автоматическое переобучение и смена модели" processRef="Process_AutoRetraining" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_AutoRetraining" name="Автоматическое переобучение" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_AutoRetraining">
+      <bpmn:lane id="Lane_Triggers" name="Мониторинг и расписание">
+        <bpmn:flowNodeRef>Start_Schedule</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Start_Drift</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Start_Labels</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_Triggers</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_NoNeed</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Orchestrator" name="Оркестратор переобучения">
+        <bpmn:flowNodeRef>Task_Preconditions</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_Pre</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Dataset</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Config</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Evaluate</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_Gates</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_Fail</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_Attempts</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Registry</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Training" name="Обучение (GPU)">
+        <bpmn:flowNodeRef>Boundary_Budget</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Boundary_Diverged</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Sub_Train</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Production" name="Продакшен">
+        <bpmn:flowNodeRef>Task_Canary</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_Canary</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Switch</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Rollback</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Team" name="Команда">
+        <bpmn:flowNodeRef>Send_Switched</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Switched</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Send_Rollback</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Rollback</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Send_Stop</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Incident</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Stopped</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start_Schedule" name="Раз в неделю">
+      <bpmn:outgoing>F01</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Start_Schedule_def">
+        <bpmn:timeCycle xsi:type="bpmn:tFormalExpression">R/P7D</bpmn:timeCycle>
+      </bpmn:timerEventDefinition>
+    </bpmn:startEvent>
+    <bpmn:startEvent id="Start_Drift" name="Дрейф выше порога">
+      <bpmn:outgoing>F02</bpmn:outgoing>
+      <bpmn:conditionalEventDefinition id="Start_Drift_def">
+        <bpmn:condition xsi:type="bpmn:tFormalExpression">${psi_scores &gt; 0.2 || moderator_disagreement_7d &gt; 0.15}</bpmn:condition>
+      </bpmn:conditionalEventDefinition>
+    </bpmn:startEvent>
+    <bpmn:startEvent id="Start_Labels" name="Новая разметка ≥ 2 000">
+      <bpmn:outgoing>F03</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="Start_Labels_def" messageRef="Msg_NewLabels" />
+    </bpmn:startEvent>
+    <bpmn:exclusiveGateway id="Gw_Triggers">
+      <bpmn:incoming>F01</bpmn:incoming>
+      <bpmn:incoming>F02</bpmn:incoming>
+      <bpmn:incoming>F03</bpmn:incoming>
+      <bpmn:outgoing>F04</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_Preconditions" name="Проверить предусловия запуска">
+      <bpmn:incoming>F04</bpmn:incoming>
+      <bpmn:outgoing>F05</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gw_Pre" name="Можно переобучать?">
+      <bpmn:incoming>F05</bpmn:incoming>
+      <bpmn:outgoing>F06</bpmn:outgoing>
+      <bpmn:outgoing>F07</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="End_NoNeed" name="Переобучение не требуется">
+      <bpmn:incoming>F06</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="Task_Dataset" name="Собрать датасет vN+1">
+      <bpmn:incoming>F07</bpmn:incoming>
+      <bpmn:outgoing>F08</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Task_Config" name="Выбрать конфиг попытки k">
+      <bpmn:incoming>F08</bpmn:incoming>
+      <bpmn:incoming>F16</bpmn:incoming>
+      <bpmn:outgoing>F09</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Task_Evaluate" name="Оценить на hold-out">
+      <bpmn:incoming>F10</bpmn:incoming>
+      <bpmn:outgoing>F13</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gw_Gates" name="Все пороги пройдены?">
+      <bpmn:incoming>F13</bpmn:incoming>
+      <bpmn:outgoing>F14</bpmn:outgoing>
+      <bpmn:outgoing>F20</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="Gw_Fail">
+      <bpmn:incoming>F11</bpmn:incoming>
+      <bpmn:incoming>F12</bpmn:incoming>
+      <bpmn:incoming>F14</bpmn:incoming>
+      <bpmn:outgoing>F15</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="Gw_Attempts" name="Попыток &lt; 3?">
+      <bpmn:incoming>F15</bpmn:incoming>
+      <bpmn:outgoing>F16</bpmn:outgoing>
+      <bpmn:outgoing>F17</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_Registry" name="Записать в реестр моделей">
+      <bpmn:incoming>F20</bpmn:incoming>
+      <bpmn:outgoing>F21</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Task_Canary" name="Canary: 10 % трафика, 24 ч">
+      <bpmn:incoming>F21</bpmn:incoming>
+      <bpmn:outgoing>F22</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gw_Canary" name="Метрики canary в норме?">
+      <bpmn:incoming>F22</bpmn:incoming>
+      <bpmn:outgoing>F23</bpmn:outgoing>
+      <bpmn:outgoing>F24</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_Switch" name="Переключить весь трафик">
+      <bpmn:incoming>F23</bpmn:incoming>
+      <bpmn:outgoing>F25</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Task_Rollback" name="Откат на champion">
+      <bpmn:incoming>F24</bpmn:incoming>
+      <bpmn:outgoing>F27</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sendTask id="Send_Switched" name="Telegram: модель сменена">
+      <bpmn:incoming>F25</bpmn:incoming>
+      <bpmn:outgoing>F26</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:endEvent id="End_Switched" name="Модель сменена">
+      <bpmn:incoming>F26</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sendTask id="Send_Rollback" name="Telegram: откат, причина">
+      <bpmn:incoming>F27</bpmn:incoming>
+      <bpmn:outgoing>F28</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:endEvent id="End_Rollback" name="Champion остаётся">
+      <bpmn:incoming>F28</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sendTask id="Send_Stop" name="Telegram: стоп, 3 попытки без успеха">
+      <bpmn:incoming>F17</bpmn:incoming>
+      <bpmn:outgoing>F18</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:userTask id="Task_Incident" name="Разобрать причину сбоя">
+      <bpmn:incoming>F18</bpmn:incoming>
+      <bpmn:outgoing>F19</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="End_Stopped" name="Остановлено, champion остаётся">
+      <bpmn:incoming>F19</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:subProcess id="Sub_Train" name="Обучение challenger (попытка k)">
+      <bpmn:incoming>F09</bpmn:incoming>
+      <bpmn:outgoing>F10</bpmn:outgoing>
+      <bpmn:startEvent id="Sub_Start">
+        <bpmn:outgoing>S1</bpmn:outgoing>
+      </bpmn:startEvent>
+      <bpmn:serviceTask id="Sub_Epoch" name="Эпоха обучения">
+        <bpmn:incoming>S1</bpmn:incoming>
+        <bpmn:incoming>S4</bpmn:incoming>
+        <bpmn:outgoing>S2</bpmn:outgoing>
+      </bpmn:serviceTask>
+      <bpmn:serviceTask id="Sub_Eval" name="ROC-AUC на validation">
+        <bpmn:incoming>S2</bpmn:incoming>
+        <bpmn:outgoing>S3</bpmn:outgoing>
+      </bpmn:serviceTask>
+      <bpmn:exclusiveGateway id="Sub_Gw" name="Критерий остановки?">
+        <bpmn:incoming>S3</bpmn:incoming>
+        <bpmn:outgoing>S4</bpmn:outgoing>
+        <bpmn:outgoing>S5</bpmn:outgoing>
+      </bpmn:exclusiveGateway>
+      <bpmn:serviceTask id="Sub_Best" name="Восстановить лучшую эпоху">
+        <bpmn:incoming>S5</bpmn:incoming>
+        <bpmn:outgoing>S6</bpmn:outgoing>
+      </bpmn:serviceTask>
+      <bpmn:endEvent id="Sub_End">
+        <bpmn:incoming>S6</bpmn:incoming>
+      </bpmn:endEvent>
+      <bpmn:sequenceFlow id="S1" sourceRef="Sub_Start" targetRef="Sub_Epoch" />
+      <bpmn:sequenceFlow id="S2" sourceRef="Sub_Epoch" targetRef="Sub_Eval" />
+      <bpmn:sequenceFlow id="S3" sourceRef="Sub_Eval" targetRef="Sub_Gw" />
+      <bpmn:sequenceFlow id="S4" name="продолжить" sourceRef="Sub_Gw" targetRef="Sub_Epoch">
+        <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${epoch &lt; 5 &amp;&amp; no_improve &lt; 2}</bpmn:conditionExpression>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="S5" name="стоп" sourceRef="Sub_Gw" targetRef="Sub_Best">
+        <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${epoch &gt;= 5 || no_improve &gt;= 2}</bpmn:conditionExpression>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="S6" sourceRef="Sub_Best" targetRef="Sub_End" />
+    </bpmn:subProcess>
+    <bpmn:boundaryEvent id="Boundary_Budget" name="Бюджет 30 мин" attachedToRef="Sub_Train">
+      <bpmn:outgoing>F11</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Boundary_Budget_def">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT30M</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="Boundary_Diverged" name="Loss = NaN / OOM" attachedToRef="Sub_Train">
+      <bpmn:outgoing>F12</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="Boundary_Diverged_def" errorRef="Error_Diverged" />
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="F01" sourceRef="Start_Schedule" targetRef="Gw_Triggers" />
+    <bpmn:sequenceFlow id="F02" sourceRef="Start_Drift" targetRef="Gw_Triggers" />
+    <bpmn:sequenceFlow id="F03" sourceRef="Start_Labels" targetRef="Gw_Triggers" />
+    <bpmn:sequenceFlow id="F04" sourceRef="Gw_Triggers" targetRef="Task_Preconditions" />
+    <bpmn:sequenceFlow id="F05" sourceRef="Task_Preconditions" targetRef="Gw_Pre" />
+    <bpmn:sequenceFlow id="F06" name="нет" sourceRef="Gw_Pre" targetRef="End_NoNeed">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${new_labels &lt; 2000 || hours_since_last &lt; 24}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F07" name="да" sourceRef="Gw_Pre" targetRef="Task_Dataset">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${new_labels &gt;= 2000 &amp;&amp; hours_since_last &gt;= 24}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F08" sourceRef="Task_Dataset" targetRef="Task_Config" />
+    <bpmn:sequenceFlow id="F09" sourceRef="Task_Config" targetRef="Sub_Train" />
+    <bpmn:sequenceFlow id="F10" sourceRef="Sub_Train" targetRef="Task_Evaluate" />
+    <bpmn:sequenceFlow id="F11" sourceRef="Boundary_Budget" targetRef="Gw_Fail" />
+    <bpmn:sequenceFlow id="F12" sourceRef="Boundary_Diverged" targetRef="Gw_Fail" />
+    <bpmn:sequenceFlow id="F13" sourceRef="Task_Evaluate" targetRef="Gw_Gates" />
+    <bpmn:sequenceFlow id="F14" name="нет" sourceRef="Gw_Gates" targetRef="Gw_Fail">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${!gates_passed}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F15" sourceRef="Gw_Fail" targetRef="Gw_Attempts" />
+    <bpmn:sequenceFlow id="F16" name="да: k + 1, другой lr" sourceRef="Gw_Attempts" targetRef="Task_Config">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${attempt &lt; 3}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F17" name="нет: лимит попыток" sourceRef="Gw_Attempts" targetRef="Send_Stop">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${attempt &gt;= 3}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F18" sourceRef="Send_Stop" targetRef="Task_Incident" />
+    <bpmn:sequenceFlow id="F19" sourceRef="Task_Incident" targetRef="End_Stopped" />
+    <bpmn:sequenceFlow id="F20" name="да" sourceRef="Gw_Gates" targetRef="Task_Registry">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${gates_passed}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F21" sourceRef="Task_Registry" targetRef="Task_Canary" />
+    <bpmn:sequenceFlow id="F22" sourceRef="Task_Canary" targetRef="Gw_Canary" />
+    <bpmn:sequenceFlow id="F23" name="да" sourceRef="Gw_Canary" targetRef="Task_Switch">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${canary_ok}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F24" name="нет" sourceRef="Gw_Canary" targetRef="Task_Rollback">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${!canary_ok}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F25" sourceRef="Task_Switch" targetRef="Send_Switched" />
+    <bpmn:sequenceFlow id="F26" sourceRef="Send_Switched" targetRef="End_Switched" />
+    <bpmn:sequenceFlow id="F27" sourceRef="Task_Rollback" targetRef="Send_Rollback" />
+    <bpmn:sequenceFlow id="F28" sourceRef="Send_Rollback" targetRef="End_Rollback" />
+    <bpmn:textAnnotation id="Note_Triggers">
+      <bpmn:text>Триггеры: раз в неделю · дрейф (PSI &gt; 0.2 или несогласие модераторов &gt; 15 %) · новая разметка ≥ 2 000 примеров</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:association id="Note_Triggers_assoc" associationDirection="None" sourceRef="Gw_Triggers" targetRef="Note_Triggers" />
+    <bpmn:textAnnotation id="Note_Stop">
+      <bpmn:text>Остановка обучения: нет улучшения ROC-AUC 2 эпохи · максимум 5 эпох · бюджет 30 мин · loss = NaN</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:association id="Note_Stop_assoc" associationDirection="None" sourceRef="Sub_Train" targetRef="Note_Stop" />
+    <bpmn:textAnnotation id="Note_Gates">
+      <bpmn:text>Пороги: ROC-AUC ≥ 0.95, F1 ≥ 0.85, fairness-критерии, лучше champion на 0.005</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:association id="Note_Gates_assoc" associationDirection="None" sourceRef="Task_Evaluate" targetRef="Note_Gates" />
+    <bpmn:textAnnotation id="Note_Canary">
+      <bpmn:text>Canary в норме: несогласие модераторов не выросло, p95 latency ≤ 20 мс, нет ошибок</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:association id="Note_Canary_assoc" associationDirection="None" sourceRef="Task_Canary" targetRef="Note_Canary" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_AutoRetraining">
+    <bpmndi:BPMNPlane id="Plane_AutoRetraining" bpmnElement="Collaboration_AutoRetraining">
+      <bpmndi:BPMNShape id="Participant_AutoRetraining_di" bpmnElement="Participant_AutoRetraining" isHorizontal="true">
+        <dc:Bounds x="120" y="80" width="2760" height="1260" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Triggers_di" bpmnElement="Lane_Triggers" isHorizontal="true">
+        <dc:Bounds x="150" y="80" width="2730" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Orchestrator_di" bpmnElement="Lane_Orchestrator" isHorizontal="true">
+        <dc:Bounds x="150" y="300" width="2730" height="280" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Training_di" bpmnElement="Lane_Training" isHorizontal="true">
+        <dc:Bounds x="150" y="580" width="2730" height="300" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Production_di" bpmnElement="Lane_Production" isHorizontal="true">
+        <dc:Bounds x="150" y="880" width="2730" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Team_di" bpmnElement="Lane_Team" isHorizontal="true">
+        <dc:Bounds x="150" y="1100" width="2730" height="240" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Sub_Train_di" bpmnElement="Sub_Train" isExpanded="true">
+        <dc:Bounds x="960" y="620" width="700" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Start_Schedule_di" bpmnElement="Start_Schedule">
+        <dc:Bounds x="202" y="112" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="244" y="113" width="100" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Start_Drift_di" bpmnElement="Start_Drift">
+        <dc:Bounds x="202" y="172" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="244" y="159" width="100" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Start_Labels_di" bpmnElement="Start_Labels">
+        <dc:Bounds x="202" y="232" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="244" y="219" width="100" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Triggers_di" bpmnElement="Gw_Triggers" isMarkerVisible="true">
+        <dc:Bounds x="355" y="165" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Preconditions_di" bpmnElement="Task_Preconditions">
+        <dc:Bounds x="420" y="430" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Pre_di" bpmnElement="Gw_Pre" isMarkerVisible="true">
+        <dc:Bounds x="575" y="445" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="555" y="500" width="90" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_NoNeed_di" bpmnElement="End_NoNeed">
+        <dc:Bounds x="582" y="232" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="624" y="236" width="100" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Dataset_di" bpmnElement="Task_Dataset">
+        <dc:Bounds x="680" y="430" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Config_di" bpmnElement="Task_Config">
+        <dc:Bounds x="820" y="430" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Sub_Start_di" bpmnElement="Sub_Start">
+        <dc:Bounds x="982" y="712" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Sub_Epoch_di" bpmnElement="Sub_Epoch">
+        <dc:Bounds x="1060" y="690" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Sub_Eval_di" bpmnElement="Sub_Eval">
+        <dc:Bounds x="1210" y="690" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Sub_Gw_di" bpmnElement="Sub_Gw" isMarkerVisible="true">
+        <dc:Bounds x="1365" y="705" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1345" y="760" width="90" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Sub_Best_di" bpmnElement="Sub_Best">
+        <dc:Bounds x="1470" y="690" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Sub_End_di" bpmnElement="Sub_End">
+        <dc:Bounds x="1594" y="712" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Evaluate_di" bpmnElement="Task_Evaluate">
+        <dc:Bounds x="1710" y="430" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Gates_di" bpmnElement="Gw_Gates" isMarkerVisible="true">
+        <dc:Bounds x="1865" y="445" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1845" y="412" width="90" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Fail_di" bpmnElement="Gw_Fail" isMarkerVisible="true">
+        <dc:Bounds x="1275" y="445" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Attempts_di" bpmnElement="Gw_Attempts" isMarkerVisible="true">
+        <dc:Bounds x="1275" y="335" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1331" y="331" width="90" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Registry_di" bpmnElement="Task_Registry">
+        <dc:Bounds x="1970" y="430" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Canary_di" bpmnElement="Task_Canary">
+        <dc:Bounds x="2110" y="900" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Canary_di" bpmnElement="Gw_Canary" isMarkerVisible="true">
+        <dc:Bounds x="2275" y="915" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2255" y="868" width="90" height="42" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Switch_di" bpmnElement="Task_Switch">
+        <dc:Bounds x="2390" y="900" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Rollback_di" bpmnElement="Task_Rollback">
+        <dc:Bounds x="2390" y="1000" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Send_Switched_di" bpmnElement="Send_Switched">
+        <dc:Bounds x="2550" y="1120" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Switched_di" bpmnElement="End_Switched">
+        <dc:Bounds x="2582" y="1242" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2550" y="1283" width="100" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Send_Rollback_di" bpmnElement="Send_Rollback">
+        <dc:Bounds x="2690" y="1120" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Rollback_di" bpmnElement="End_Rollback">
+        <dc:Bounds x="2722" y="1242" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2690" y="1283" width="100" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Send_Stop_di" bpmnElement="Send_Stop">
+        <dc:Bounds x="600" y="1120" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Incident_di" bpmnElement="Task_Incident">
+        <dc:Bounds x="750" y="1120" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Stopped_di" bpmnElement="End_Stopped">
+        <dc:Bounds x="912" y="1142" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="880" y="1183" width="100" height="42" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Boundary_Budget_di" bpmnElement="Boundary_Budget">
+        <dc:Bounds x="1162" y="602" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1202" y="584" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Boundary_Diverged_di" bpmnElement="Boundary_Diverged">
+        <dc:Bounds x="1422" y="602" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1462" y="584" width="90" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Note_Triggers_di" bpmnElement="Note_Triggers">
+        <dc:Bounds x="700" y="100" width="420" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Note_Stop_di" bpmnElement="Note_Stop">
+        <dc:Bounds x="1730" y="640" width="400" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Note_Gates_di" bpmnElement="Note_Gates">
+        <dc:Bounds x="1760" y="120" width="400" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Note_Canary_di" bpmnElement="Note_Canary">
+        <dc:Bounds x="2300" y="120" width="420" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="F01_di" bpmnElement="F01">
+        <di:waypoint x="238" y="130" />
+        <di:waypoint x="380" y="130" />
+        <di:waypoint x="380" y="165" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F02_di" bpmnElement="F02">
+        <di:waypoint x="238" y="190" />
+        <di:waypoint x="355" y="190" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F03_di" bpmnElement="F03">
+        <di:waypoint x="238" y="250" />
+        <di:waypoint x="380" y="250" />
+        <di:waypoint x="380" y="215" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F04_di" bpmnElement="F04">
+        <di:waypoint x="405" y="190" />
+        <di:waypoint x="470" y="190" />
+        <di:waypoint x="470" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F05_di" bpmnElement="F05">
+        <di:waypoint x="520" y="470" />
+        <di:waypoint x="575" y="470" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F06_di" bpmnElement="F06">
+        <di:waypoint x="600" y="445" />
+        <di:waypoint x="600" y="268" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="533" y="395" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F07_di" bpmnElement="F07">
+        <di:waypoint x="625" y="470" />
+        <di:waypoint x="680" y="470" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="632" y="450" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F08_di" bpmnElement="F08">
+        <di:waypoint x="780" y="470" />
+        <di:waypoint x="820" y="470" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F09_di" bpmnElement="F09">
+        <di:waypoint x="920" y="470" />
+        <di:waypoint x="940" y="470" />
+        <di:waypoint x="940" y="730" />
+        <di:waypoint x="960" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="S1_di" bpmnElement="S1">
+        <di:waypoint x="1018" y="730" />
+        <di:waypoint x="1060" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="S2_di" bpmnElement="S2">
+        <di:waypoint x="1160" y="730" />
+        <di:waypoint x="1210" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="S3_di" bpmnElement="S3">
+        <di:waypoint x="1310" y="730" />
+        <di:waypoint x="1365" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="S4_di" bpmnElement="S4">
+        <di:waypoint x="1390" y="705" />
+        <di:waypoint x="1390" y="660" />
+        <di:waypoint x="1110" y="660" />
+        <di:waypoint x="1110" y="690" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1205" y="642" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="S5_di" bpmnElement="S5">
+        <di:waypoint x="1415" y="730" />
+        <di:waypoint x="1470" y="730" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1397" y="710" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="S6_di" bpmnElement="S6">
+        <di:waypoint x="1570" y="730" />
+        <di:waypoint x="1594" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F10_di" bpmnElement="F10">
+        <di:waypoint x="1660" y="730" />
+        <di:waypoint x="1700" y="730" />
+        <di:waypoint x="1700" y="470" />
+        <di:waypoint x="1710" y="470" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F11_di" bpmnElement="F11">
+        <di:waypoint x="1180" y="602" />
+        <di:waypoint x="1180" y="470" />
+        <di:waypoint x="1275" y="470" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F12_di" bpmnElement="F12">
+        <di:waypoint x="1440" y="602" />
+        <di:waypoint x="1440" y="470" />
+        <di:waypoint x="1325" y="470" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F13_di" bpmnElement="F13">
+        <di:waypoint x="1810" y="470" />
+        <di:waypoint x="1865" y="470" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F14_di" bpmnElement="F14">
+        <di:waypoint x="1890" y="495" />
+        <di:waypoint x="1890" y="550" />
+        <di:waypoint x="1300" y="550" />
+        <di:waypoint x="1300" y="495" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1600" y="532" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F15_di" bpmnElement="F15">
+        <di:waypoint x="1300" y="445" />
+        <di:waypoint x="1300" y="385" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F16_di" bpmnElement="F16">
+        <di:waypoint x="1275" y="360" />
+        <di:waypoint x="870" y="360" />
+        <di:waypoint x="870" y="430" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1050" y="330" width="90" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F17_di" bpmnElement="F17">
+        <di:waypoint x="1300" y="335" />
+        <di:waypoint x="1300" y="320" />
+        <di:waypoint x="650" y="320" />
+        <di:waypoint x="650" y="1120" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="660" y="324" width="90" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F18_di" bpmnElement="F18">
+        <di:waypoint x="700" y="1160" />
+        <di:waypoint x="750" y="1160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F19_di" bpmnElement="F19">
+        <di:waypoint x="850" y="1160" />
+        <di:waypoint x="912" y="1160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F20_di" bpmnElement="F20">
+        <di:waypoint x="1915" y="470" />
+        <di:waypoint x="1970" y="470" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1925" y="450" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F21_di" bpmnElement="F21">
+        <di:waypoint x="2070" y="470" />
+        <di:waypoint x="2160" y="470" />
+        <di:waypoint x="2160" y="900" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F22_di" bpmnElement="F22">
+        <di:waypoint x="2210" y="940" />
+        <di:waypoint x="2275" y="940" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F23_di" bpmnElement="F23">
+        <di:waypoint x="2325" y="940" />
+        <di:waypoint x="2390" y="940" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2333" y="920" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F24_di" bpmnElement="F24">
+        <di:waypoint x="2300" y="965" />
+        <di:waypoint x="2300" y="1040" />
+        <di:waypoint x="2390" y="1040" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2306" y="1000" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F25_di" bpmnElement="F25">
+        <di:waypoint x="2490" y="940" />
+        <di:waypoint x="2600" y="940" />
+        <di:waypoint x="2600" y="1120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F26_di" bpmnElement="F26">
+        <di:waypoint x="2600" y="1200" />
+        <di:waypoint x="2600" y="1242" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F27_di" bpmnElement="F27">
+        <di:waypoint x="2490" y="1040" />
+        <di:waypoint x="2740" y="1040" />
+        <di:waypoint x="2740" y="1120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F28_di" bpmnElement="F28">
+        <di:waypoint x="2740" y="1200" />
+        <di:waypoint x="2740" y="1242" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Note_Triggers_assoc_di" bpmnElement="Note_Triggers_assoc">
+        <di:waypoint x="393" y="178" />
+        <di:waypoint x="700" y="130" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Note_Stop_assoc_di" bpmnElement="Note_Stop_assoc">
+        <di:waypoint x="1660" y="660" />
+        <di:waypoint x="1730" y="670" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Note_Gates_assoc_di" bpmnElement="Note_Gates_assoc">
+        <di:waypoint x="1790" y="430" />
+        <di:waypoint x="1850" y="180" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Note_Canary_assoc_di" bpmnElement="Note_Canary_assoc">
+        <di:waypoint x="2190" y="900" />
+        <di:waypoint x="2360" y="180" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
