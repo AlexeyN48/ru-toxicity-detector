@@ -1,0 +1,40 @@
+# Automatic retraining policy (HW3): triggers, stop criteria, quality gates, canary.
+# Drawn in docs/bpmn/auto_retraining.bpmn and described in docs/AUTO_RETRAINING.md.
+
+triggers:
+  schedule: weekly # timer start event, R/P7D
+  drift:
+    psi_scores: 0.2 # PSI of predicted scores vs the reference period
+    moderator_disagreement_7d: 0.15 # share of comments where moderators overruled the model
+  new_labels_message: true # message start event: a new batch of moderator labels
+
+preconditions:
+  min_new_labels: 2000
+  cooldown_hours: 24
+
+# stop criteria inside one training attempt
+training:
+  config: configs/train_base_aug.yaml
+  max_epochs: 5
+  early_stopping_patience: 2 # epochs without ROC-AUC improvement on validation
+  time_budget_minutes: 30
+  stop_on_nan_loss: true
+
+# stop criteria for the whole run
+attempts:
+  max_attempts: 3
+  learning_rates: [2.0e-5, 1.0e-5, 3.0e-5] # one per attempt
+
+# the challenger must pass all of them to reach canary
+gates:
+  roc_auc: 0.95
+  f1_toxic: 0.85
+  fairness_passed: true
+  min_auc_gain_over_champion: 0.005
+
+canary:
+  traffic_share: 0.10
+  duration_hours: 24
+  max_disagreement_increase: 0.0
+  max_p95_latency_ms: 20
+  max_error_rate: 0.0
