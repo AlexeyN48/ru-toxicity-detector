@@ -105,6 +105,7 @@ uv run python -m toxicity.app   # страница откроется сама (
 |---|---|---|
 | [Model Card](docs/MODEL_CARD.md) | цель, метрики, ограничения, bias/fairness, версия данных | ДЗ 1 |
 | [Жизненный цикл модели](docs/LIFECYCLE.md) | BPMN от запроса бизнеса до вывода из эксплуатации, workflow согласования ([схема](docs/bpmn/model_lifecycle.png)) | ДЗ 1 |
+| [Эксплуатация модели](docs/MODERATION_PROCESS.md) | BPMN работы модели в продукте: модерация комментариев с очередью, жалобами, SLA и безопасным отказом ([схема 01](docs/bpmn/moderation_process.png)), подпроцесс оценки комментария ([схема 02](docs/bpmn/scoring_subprocess.png)) | ДЗ 1 |
 | [Retraining-цикл](docs/RETRAINING.md) | BPMN переобучения: триггер по дрифту, валидация, аукцион по AUC, деплой, Telegram ([схема](docs/bpmn/retraining_cycle.png)) | ДЗ 2 |
 | [Автоматическое переобучение](docs/AUTO_RETRAINING.md) | BPMN автоматического переобучения и смены модели: три триггера, критерии остановки, canary и откат ([схема](docs/bpmn/auto_retraining.png), [пороги](configs/auto_retraining.yaml)) | ДЗ 3 |
 | [Правила работы](CONTRIBUTING.md) | окружение, ветки, коммиты, Pull Request, код-ревью | — |
