@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_Scoring" targetNamespace="https://github.com/ru-toxicity-detector" exporter="ru-toxicity-detector" exporterVersion="1.0">
+  <bpmn:error id="Error_ModelFailure" name="Ошибка модели" errorCode="MODEL_ERROR" />
+  <bpmn:collaboration id="Collaboration_Scoring">
+    <bpmn:participant id="Participant_Scoring" name="02. Подпроцесс «Оценить токсичность» (схема 01)" processRef="Process_Scoring" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_Scoring" name="Оценка комментария моделью" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_Scoring">
+      <bpmn:lane id="Lane_Prep" name="Подготовка текста">
+        <bpmn:flowNodeRef>Start_Scoring</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Clean</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_Text</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Empty</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Tokenize</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Infer" name="Инференс и результат">
+        <bpmn:flowNodeRef>Task_Infer</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Error_Infer</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Error</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Threshold</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Log</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Done</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start_Scoring" name="Комментарий получен">
+      <bpmn:outgoing>Flow_01</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="Task_Clean" name="Очистить текст">
+      <bpmn:incoming>Flow_01</bpmn:incoming>
+      <bpmn:outgoing>Flow_02</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gw_Text" name="Текст не пустой?">
+      <bpmn:incoming>Flow_02</bpmn:incoming>
+      <bpmn:outgoing>Flow_03</bpmn:outgoing>
+      <bpmn:outgoing>Flow_04</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="End_Empty" name="Нечего проверять: p = 0">
+      <bpmn:incoming>Flow_04</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="Task_Tokenize" name="Разбить на токены (до 128)">
+      <bpmn:incoming>Flow_03</bpmn:incoming>
+      <bpmn:outgoing>Flow_05</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Task_Infer" name="Инференс модели (≤ 3 попытки)">
+      <bpmn:incoming>Flow_05</bpmn:incoming>
+      <bpmn:outgoing>Flow_07</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:boundaryEvent id="Error_Infer" name="Сбой / таймаут" cancelActivity="true" attachedToRef="Task_Infer">
+      <bpmn:outgoing>Flow_06</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="Error_Infer_def" errorRef="Error_ModelFailure" />
+    </bpmn:boundaryEvent>
+    <bpmn:endEvent id="End_Error" name="Ошибка модели → схема 01">
+      <bpmn:incoming>Flow_06</bpmn:incoming>
+      <bpmn:errorEventDefinition id="End_Error_def" errorRef="Error_ModelFailure" />
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="Task_Threshold" name="Применить порог">
+      <bpmn:incoming>Flow_07</bpmn:incoming>
+      <bpmn:outgoing>Flow_08</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Task_Log" name="Записать в лог">
+      <bpmn:incoming>Flow_08</bpmn:incoming>
+      <bpmn:outgoing>Flow_09</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="End_Done" name="Оценка готова">
+      <bpmn:incoming>Flow_09</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_01" sourceRef="Start_Scoring" targetRef="Task_Clean" />
+    <bpmn:sequenceFlow id="Flow_02" sourceRef="Task_Clean" targetRef="Gw_Text" />
+    <bpmn:sequenceFlow id="Flow_03" name="да" sourceRef="Gw_Text" targetRef="Task_Tokenize">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${text_length &gt; 0}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_04" name="нет" sourceRef="Gw_Text" targetRef="End_Empty">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${text_length == 0}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_05" sourceRef="Task_Tokenize" targetRef="Task_Infer" />
+    <bpmn:sequenceFlow id="Flow_06" sourceRef="Error_Infer" targetRef="End_Error" />
+    <bpmn:sequenceFlow id="Flow_07" sourceRef="Task_Infer" targetRef="Task_Threshold" />
+    <bpmn:sequenceFlow id="Flow_08" sourceRef="Task_Threshold" targetRef="Task_Log" />
+    <bpmn:sequenceFlow id="Flow_09" sourceRef="Task_Log" targetRef="End_Done" />
+    <bpmn:textAnnotation id="Note_Clean">
+      <bpmn:text>Как при подготовке данных (data.py): убрать пробелы по краям; регистр, пунктуацию и эмодзи не трогаем — в них сигнал токсичности</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:association id="Note_Clean_assoc" associationDirection="None" sourceRef="Task_Clean" targetRef="Note_Clean" />
+    <bpmn:textAnnotation id="Note_Infer">
+      <bpmn:text>Таймаут 1 с на попытку. Цель из Model Card: ≤ 20 мс на комментарий; факт — около 11 мс на RTX 4060</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:association id="Note_Infer_assoc" associationDirection="None" sourceRef="Task_Infer" targetRef="Note_Infer" />
+    <bpmn:textAnnotation id="Note_Log">
+      <bpmn:text>Пишем p, версию модели и порог из metrics.json. Лог скоров — основа мониторинга дрифта (PSI, ДЗ 2)</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:association id="Note_Log_assoc" associationDirection="None" sourceRef="Task_Log" targetRef="Note_Log" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_Scoring">
+    <bpmndi:BPMNPlane id="Plane_Scoring" bpmnElement="Collaboration_Scoring">
+      <bpmndi:BPMNShape id="Participant_Scoring_di" bpmnElement="Participant_Scoring" isHorizontal="true">
+        <dc:Bounds x="120" y="80" width="1220" height="440" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Prep_di" bpmnElement="Lane_Prep" isHorizontal="true">
+        <dc:Bounds x="150" y="80" width="1190" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Infer_di" bpmnElement="Lane_Infer" isHorizontal="true">
+        <dc:Bounds x="150" y="300" width="1190" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Start_Scoring_di" bpmnElement="Start_Scoring">
+        <dc:Bounds x="212" y="132" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="180" y="173" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Clean_di" bpmnElement="Task_Clean">
+        <dc:Bounds x="310" y="110" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Text_di" bpmnElement="Gw_Text" isMarkerVisible="true">
+        <dc:Bounds x="475" y="125" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="470" y="103" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Empty_di" bpmnElement="End_Empty">
+        <dc:Bounds x="482" y="232" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="450" y="273" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Tokenize_di" bpmnElement="Task_Tokenize">
+        <dc:Bounds x="590" y="110" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Infer_di" bpmnElement="Task_Infer">
+        <dc:Bounds x="750" y="330" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Error_Infer_di" bpmnElement="Error_Infer">
+        <dc:Bounds x="812" y="392" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="852" y="425" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Error_di" bpmnElement="End_Error">
+        <dc:Bounds x="812" y="452" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="780" y="493" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Threshold_di" bpmnElement="Task_Threshold">
+        <dc:Bounds x="910" y="330" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Log_di" bpmnElement="Task_Log">
+        <dc:Bounds x="1060" y="330" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Done_di" bpmnElement="End_Done">
+        <dc:Bounds x="1232" y="352" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1200" y="393" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Note_Clean_di" bpmnElement="Note_Clean">
+        <dc:Bounds x="240" y="205" width="230" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Note_Infer_di" bpmnElement="Note_Infer">
+        <dc:Bounds x="530" y="420" width="230" height="75" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Note_Log_di" bpmnElement="Note_Log">
+        <dc:Bounds x="1040" y="440" width="240" height="75" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_01_di" bpmnElement="Flow_01">
+        <di:waypoint x="248" y="150" />
+        <di:waypoint x="310" y="150" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_02_di" bpmnElement="Flow_02">
+        <di:waypoint x="410" y="150" />
+        <di:waypoint x="475" y="150" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_03_di" bpmnElement="Flow_03">
+        <di:waypoint x="525" y="150" />
+        <di:waypoint x="590" y="150" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="532" y="132" width="40" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_04_di" bpmnElement="Flow_04">
+        <di:waypoint x="500" y="175" />
+        <di:waypoint x="500" y="232" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="506" y="190" width="40" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_05_di" bpmnElement="Flow_05">
+        <di:waypoint x="690" y="150" />
+        <di:waypoint x="800" y="150" />
+        <di:waypoint x="800" y="330" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_06_di" bpmnElement="Flow_06">
+        <di:waypoint x="830" y="428" />
+        <di:waypoint x="830" y="452" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_07_di" bpmnElement="Flow_07">
+        <di:waypoint x="850" y="370" />
+        <di:waypoint x="910" y="370" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_08_di" bpmnElement="Flow_08">
+        <di:waypoint x="1010" y="370" />
+        <di:waypoint x="1060" y="370" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_09_di" bpmnElement="Flow_09">
+        <di:waypoint x="1160" y="370" />
+        <di:waypoint x="1232" y="370" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Note_Clean_assoc_di" bpmnElement="Note_Clean_assoc">
+        <di:waypoint x="360" y="190" />
+        <di:waypoint x="350" y="215" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Note_Infer_assoc_di" bpmnElement="Note_Infer_assoc">
+        <di:waypoint x="750" y="400" />
+        <di:waypoint x="760" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Note_Log_assoc_di" bpmnElement="Note_Log_assoc">
+        <di:waypoint x="1110" y="410" />
+        <di:waypoint x="1140" y="440" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

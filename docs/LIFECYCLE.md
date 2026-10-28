@@ -6,6 +6,7 @@ BPMN-процесс жизненного цикла модели `ru-toxicity-de
 - Исходник схемы: [`bpmn/model_lifecycle.bpmn`](bpmn/model_lifecycle.bpmn) — открывается в [bpmn.io](https://demo.bpmn.io/)
 - Картинка: [`bpmn/model_lifecycle.png`](bpmn/model_lifecycle.png)
 - Retraining-цикл (свёрнутый подпроцесс на схеме) подробно описан в [RETRAINING.md](RETRAINING.md) (ДЗ 2)
+- Как модель работает в продукте (эксплуатация: модерация комментариев) — в [MODERATION_PROCESS.md](MODERATION_PROCESS.md)
 
 ![Жизненный цикл модели](bpmn/model_lifecycle.png)
 
